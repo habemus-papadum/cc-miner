@@ -56,3 +56,33 @@ manifest.
 
 The root `devDependencies` are carried wholesale from the source repo and are a superset — worth
 pruning once the toolchain here settles.
+
+## Developing against the aiui packages' source
+
+The cost of this repo being separate from `pdum_aiui` is that `@habemus-papadum/*`
+now arrives from npm, so a one-line fix upstream is a publish away. Three levers,
+smallest first:
+
+```sh
+pnpm link:up                     # every aiui dep → ../pdum_aiui source
+pnpm link:up aiui-viz            # just that one
+pnpm link:up --path ~/work/aiui  # an upstream checkout elsewhere
+pnpm upstream                    # what is linked right now
+pnpm unlink:up                   # back to the published versions
+```
+
+`link:up` defaults to a **sibling** `../pdum_aiui`, which is the layout to keep.
+It writes a fenced `overrides` block into `pnpm-workspace.yaml` and reinstalls;
+the linked package then resolves to its `src/index.ts` and HMR works as it did
+inside the monorepo. Verified: typecheck, build and tests all pass linked.
+
+Overrides rather than `pnpm link` on purpose — an override redirects *every*
+resolution of a name, direct or transitive, so it cannot produce two copies of
+one library. See the header of `scripts/upstream.mjs`.
+
+**A link is local state, never committed.** It names a path that exists on one
+machine. `pnpm upstream:check` runs in CI and fails the build if one survives
+into a commit, so the mistake is a sentence rather than a broken clone.
+
+For anything longer-lived than an afternoon, prefer publishing a canary from
+`pdum_aiui` (`gh workflow run canary.yml`) and depending on the real version.

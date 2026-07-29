@@ -4,9 +4,13 @@
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "typecheck": "pnpm -r typecheck",
+    "link:up": "node scripts/upstream.mjs link",
+    "lint": "biome check .",
     "test": "pnpm -r test",
-    "lint": "biome check ."
+    "typecheck": "pnpm -r typecheck",
+    "unlink:up": "node scripts/upstream.mjs unlink",
+    "upstream": "node scripts/upstream.mjs status",
+    "upstream:check": "node scripts/upstream.mjs check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.2",

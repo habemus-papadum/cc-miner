@@ -33,6 +33,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # A link points at a path that exists on one machine. If one survives into a
+      # commit, every other clone installs something different — so this fails the
+      # build with a sentence rather than letting it surface as an install error.
+      - run: pnpm upstream:check
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
