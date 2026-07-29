@@ -47,6 +47,12 @@ pnpm -C pdum-cc-miner pack:linux    # .AppImage + .deb   (must run on Linux)
 See [`pdum-cc-miner/README.md`](./pdum-cc-miner/README.md) for the size budget, the signing and
 notarization requirements, and the one entitlement that turns out to be load-bearing.
 
+## What is next
+
+[`DEPLOYMENT.md`](./DEPLOYMENT.md) — the signing and notarization steps (an Apple Developer
+account is all that is missing), what is measured versus what has never run, and the plan to
+extract the Electron and DuckDB/Mosaic infrastructure into their own packages.
+
 ## Provenance
 
 Evicted from [`habemus-papadum/pdum_aiui`](https://github.com/habemus-papadum/pdum_aiui) by its
