@@ -1,0 +1,41 @@
+{
+  "name": "@habemus-papadum/cc-assay",
+  "version": "0.12.0",
+  "description": "Mine Claude Code transcripts into Parquet: raw ingest, then analytic grains.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/habemus-papadum/pdum_aiui.git",
+    "directory": "apps/cc-assay"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "cc-assay": "./bin/cc-assay.mjs"
+  },
+  "scripts": {
+    "export": "tsx src/export-cli.ts",
+    "normalize": "tsx src/cli.ts",
+    "raw": "tsx src/raw-cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "private": true,
+  "dependencies": {
+    "@duckdb/node-api": "1.5.5-r.2",
+    "hyparquet": "^1.20.0",
+    "hyparquet-writer": "^0.16.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.22.5",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Hardened runtime is required for notarization, and it turns off four
+      things this app needs. Each key below is a hole punched in it, so each one
+      is justified rather than copied.
+
+      Deliberately ABSENT: com.apple.security.app-sandbox. cc-miner reads
+      ~/.claude, a dot-directory the sandbox excludes — which is why the Mac App
+      Store is not a distribution channel for this app at all, and why Developer
+      ID + notarization is.
+    -->
+
+    <!--
+      V8 compiles JavaScript to machine code at runtime. Without these two,
+      Electron does not start at all.
+    -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!--
+      MEASURED, not assumed — this is the one that was in doubt.
+
+      Library validation requires every loaded Mach-O to be signed by the same
+      Team ID as the host process (or by Apple). cc-miner loads two kinds that
+      are not:
+
+        libduckdb.dylib   112 MB, shipped by DuckDB, signed by DuckDB
+        quack/httpfs/aws  DuckDB extensions fetched at first query into
+                          ~/.duckdb/extensions and dlopen'd from there
+
+      With hardened runtime and WITHOUT this key, the sidecar dies before it can
+      serve anything. See the experiment recorded in the P5 commit.
+    -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!--
+      The sidecar is spawned as a child of the app and inherits its environment;
+      Electron sets ELECTRON_RUN_AS_NODE and friends on the way. Hardened
+      runtime otherwise scrubs DYLD_* and related variables from children.
+    -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+
+    <!--
+      Outbound network: DuckDB fetches its own extensions on first query, S3 mode
+      talks to AWS, and the updater polls GitHub Releases. No inbound server —
+      quack_serve binds 127.0.0.1 only.
+    -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+</dict>
+</plist>

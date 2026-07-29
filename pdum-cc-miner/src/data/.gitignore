@@ -1,0 +1,14 @@
+# Personal telemetry: conversation text, project names, branch names, cwd paths.
+# Regenerate with `pnpm normalize`; NEVER commit.
+#
+# Ignore everything, rather than naming extensions. The previous version listed
+# `*.parquet` and `manifest.json`, which left `index.json` and
+# `replay/index.json` — session ids, sizes and timings — trackable. A denylist
+# here has to stay right about every file the exporter will ever emit; this only
+# has to be right once.
+#
+# This file was deleted once, when the directory was regenerated, and 122 files
+# of personal telemetry were committed in its place. Nothing had been pushed, so
+# the history was rewritten. Do not remove it again.
+*
+!.gitignore

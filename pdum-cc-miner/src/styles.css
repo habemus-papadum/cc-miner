@@ -1,0 +1,958 @@
+/**
+ * styles.css — the ledger page's look, in the demos' shared dark-journal idiom.
+ *
+ * Every class is `cco-` prefixed (or nested under `.cco`) so this page can be
+ * mounted beside another aiui app in one document without leaking style onto
+ * it — the same discipline demos/gears uses with its `.gears` root class.
+ */
+
+.cco {
+  --cco-bg: #14161a;
+  --cco-panel: #1a1d23;
+  --cco-fg: #e6e9ef;
+  --cco-fg-dim: #99a1b3;
+  --cco-rule: #2b303a;
+  --cco-accent: #7aa2f7;
+
+  /* The token classes, ordered by how much they cost: the two cache classes
+     read as one warm family so the eye groups them against generation. */
+  --cco-cache-read: #e0a458;
+  --cco-cache-create: #b98246;
+  --cco-output: #7aa2f7;
+  --cco-input: #56c2a5;
+
+  background: var(--cco-bg);
+  color: var(--cco-fg);
+  font:
+    14px / 1.55 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  min-height: 100vh;
+  padding: 28px clamp(16px, 4vw, 48px) 64px;
+  /* The page itself must never scroll sideways — wide content scrolls inside
+     its own panel instead (.cco-table-scroll, .cco-chart). */
+  max-width: 1600px;
+  margin: 0 inline-auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+.cco *,
+.cco *::before,
+.cco *::after {
+  box-sizing: border-box;
+}
+
+.cco-head {
+  margin-bottom: 28px;
+}
+.cco-h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.cco-sub {
+  color: var(--cco-fg-dim);
+  margin: 4px 0 0;
+}
+.cco-h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  letter-spacing: 0.01em;
+}
+.cco-h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--cco-fg-dim);
+}
+
+.cco-note {
+  color: var(--cco-fg-dim);
+  font-size: 12.5px;
+  margin: 8px 0 0;
+  max-width: 68ch;
+}
+.cco-note-tight {
+  margin: 0 0 8px;
+}
+.cco-warn {
+  color: #f7768e;
+}
+
+.cco-panel {
+  background: var(--cco-panel);
+  border: 1px solid var(--cco-rule);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.cco-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* --- summary strip --- */
+.cco-summary {
+  margin-bottom: 18px;
+}
+.cco-stats {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.cco-stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cco-stat-label {
+  color: var(--cco-fg-dim);
+  font-size: 11.5px;
+  text-transform: lowercase;
+}
+.cco-stat-wide .cco-stat-value {
+  font-size: 15px;
+  padding-top: 6px;
+}
+
+.cco-classes {
+  background: var(--cco-panel);
+  border: 1px solid var(--cco-rule);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.cco-class {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 4px 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.cco-class-head {
+  display: flex;
+  justify-content: space-between;
+  grid-column: 1;
+}
+.cco-class-label {
+  font-size: 12.5px;
+}
+.cco-class-share {
+  color: var(--cco-fg-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cco-class-track {
+  grid-column: 1;
+  height: 8px;
+  background: #22262e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cco-class-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 180ms ease;
+}
+.cco-class-cost {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+.cco-provenance {
+  color: var(--cco-fg-dim);
+  font-size: 11.5px;
+  line-height: 1.6;
+  margin: 14px 0 0;
+  max-width: 82ch;
+}
+.cco-provenance code {
+  color: var(--cco-fg);
+  background: #22262e;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* --- charts --- */
+.cco-chart {
+  overflow-x: auto;
+}
+.cco-chart svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* --- attribution --- */
+.cco-attr {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 26px;
+}
+.cco-attr-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 62px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.cco-attr-key {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cco-attr-baseline .cco-attr-key {
+  color: var(--cco-fg-dim);
+  font-style: italic;
+}
+.cco-attr-track {
+  height: 6px;
+  background: #22262e;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.cco-attr-fill {
+  display: block;
+  height: 100%;
+  background: var(--cco-accent);
+  border-radius: 3px;
+}
+.cco-attr-baseline .cco-attr-fill {
+  background: #3d4657;
+}
+.cco-attr-cost {
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--cco-fg-dim);
+}
+
+/* --- sessions --- */
+/* Wide content scrolls inside its own panel; the page body never scrolls sideways. */
+.cco-table-scroll {
+  overflow-x: auto;
+}
+.cco-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 12.5px;
+}
+.cco-table th {
+  text-align: left;
+  color: var(--cco-fg-dim);
+  font-weight: 500;
+  font-size: 11px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--cco-rule);
+}
+.cco-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #20242c;
+}
+.cco-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cco-sess-project {
+  font-weight: 500;
+}
+.cco-sess-slug {
+  color: var(--cco-fg-dim);
+  margin-left: 8px;
+  font-size: 11.5px;
+}
+.cco-sess-bar {
+  width: 30%;
+  min-width: 140px;
+}
+.cco-span-track {
+  height: 12px;
+  background: #1f232a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+/* outer = wall-clock span; inner = work inside it. The visible remainder IS the idle time. */
+.cco-span-fill {
+  height: 100%;
+  background: #313846;
+  border-radius: 3px;
+}
+.cco-active-fill {
+  height: 100%;
+  background: var(--cco-accent);
+  border-radius: 3px;
+}
+.cco-duty-low {
+  color: #e0a458;
+}
+
+/* --- loading / empty --- */
+.cco-loading {
+  max-width: 420px;
+  margin: 80px auto;
+}
+.cco-loading-label {
+  color: var(--cco-fg-dim);
+  font-size: 12.5px;
+  margin-bottom: 8px;
+}
+.cco-loading-track {
+  height: 4px;
+  background: #22262e;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.cco-loading-fill {
+  height: 100%;
+  background: var(--cco-accent);
+  transition: width 120ms linear;
+}
+.cco-loading-indeterminate {
+  width: 30%;
+  animation: cco-slide 1.1s ease-in-out infinite;
+}
+@keyframes cco-slide {
+  0% {
+    margin-left: -30%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
+
+.cco-nodata {
+  max-width: 620px;
+  margin: 60px auto;
+}
+.cco-cmd,
+.cco-err {
+  background: #0f1115;
+  border: 1px solid var(--cco-rule);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.cco-err {
+  color: #f7768e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cco-class-fill,
+  .cco-loading-fill {
+    transition: none;
+  }
+  .cco-loading-indeterminate {
+    animation: none;
+    width: 100%;
+  }
+}
+
+/* --- the session graph ---------------------------------------------------- */
+
+.cco .cco-tl-wrap {
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 460px;
+  margin-top: 10px;
+  border-top: 1px solid var(--cco-rule);
+  border-bottom: 1px solid var(--cco-rule);
+  padding: 8px 0 2px;
+}
+
+.cco .cco-tl-svg {
+  display: block;
+  touch-action: none; /* pointer capture owns the drag, not the scroller */
+  cursor: crosshair;
+  user-select: none;
+}
+
+.cco .cco-tl-stage {
+  position: relative;
+}
+
+/* the fold controls, laid over the SVG's left gutter */
+.cco .cco-tl-fold {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 18px;
+  padding: 0 4px 0 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--cco-fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+.cco .cco-tl-fold:hover,
+.cco .cco-tl-fold:focus-visible {
+  background: rgb(255 255 255 / 6%);
+  color: var(--cco-fg);
+  outline: none;
+}
+.cco .cco-tl-caret {
+  font-size: 10px;
+  width: 8px;
+  opacity: 0.85;
+}
+.cco .cco-tl-proj {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.cco .cco-tl-count {
+  color: var(--cco-rule);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.cco .cco-tl-tick {
+  fill: var(--cco-fg-dim);
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.cco .cco-tl-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cco .cco-tl-stat {
+  color: var(--cco-fg-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cco .cco-tl-btn {
+  background: transparent;
+  border: 1px solid var(--cco-rule);
+  border-radius: 4px;
+  color: var(--cco-fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+.cco .cco-tl-btn:hover {
+  border-color: var(--cco-accent);
+  color: var(--cco-fg);
+}
+
+.cco .cco-tl-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  background: #0f1115;
+  border: 1px solid var(--cco-rule);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--cco-fg-dim);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+  white-space: nowrap;
+}
+.cco .cco-tl-tip-head {
+  color: var(--cco-fg);
+  font-weight: 600;
+  /* An AI title is a sentence ("Debug .zprofile SSH keychain issue in VS
+     Code"), not a slug, so the head needs a bound the other rows do not. */
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cco-tl-tip-was {
+  color: var(--cco-fg-faint, var(--cco-fg-dim));
+  font-style: italic;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cco .cco-tl-tip-row {
+  font-variant-numeric: tabular-nums;
+}
+
+.cco .cco-tl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  align-items: center;
+  margin-top: 9px;
+  font-size: 11px;
+  color: var(--cco-fg-dim);
+}
+.cco .cco-tl-legend-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cco .cco-tl-legend-label {
+  color: var(--cco-fg-dim);
+}
+.cco .cco-tl-legend-scale {
+  margin-left: 4px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+.cco .cco-tl-swatch {
+  width: 13px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.cco .cco-tl-fork-key {
+  width: 18px;
+  height: 0;
+  border-top: 1.4px solid #c2872f;
+  display: inline-block;
+}
+.cco .cco-tl-fork-amb {
+  border-top-style: dotted;
+}
+.cco .cco-tl-ghost-key {
+  width: 13px;
+  height: 9px;
+  border: 1px dashed #c2872f;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* --- the drill-down: one session, turn by turn ----------------------------- */
+
+/* The sessions table is the way into the drill-down, so its rows have to look
+   like they do something. */
+.cco-sess-row {
+  cursor: pointer;
+}
+
+.cco-sess-row:hover {
+  background: #1f232b;
+}
+
+.cco-sess-row-on {
+  background: #202634;
+  box-shadow: inset 2px 0 0 var(--cco-accent);
+}
+
+.cco-detail-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 2px 0 6px;
+}
+
+.cco-detail-name {
+  color: var(--cco-fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cco-detail-was {
+  color: var(--cco-fg-dim);
+  font-size: 11px;
+  font-style: italic;
+}
+
+.cco-detail-meta {
+  color: var(--cco-fg-dim);
+  font-size: 11px;
+}
+
+.cco-detail-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  color: var(--cco-fg-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+
+.cco-detail-stats b {
+  color: var(--cco-fg);
+  font-weight: 600;
+}
+
+.cco-btn {
+  background: transparent;
+  border: 1px solid var(--cco-rule);
+  border-radius: 4px;
+  color: var(--cco-fg-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.cco-btn:hover {
+  border-color: var(--cco-accent);
+  color: var(--cco-fg);
+}
+
+/* --- replay: the transcript ------------------------------------------------ */
+
+.cco-rp-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+  margin: 10px 0 6px;
+}
+
+/* One cell per active hour; height encodes block count, so the strip doubles
+   as the shape of the session. */
+.cco-rp-hours {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 30px;
+  flex: 1 1 320px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.cco-rp-hour {
+  flex: 0 0 8px;
+  height: 100%;
+  min-width: 8px;
+  background: linear-gradient(
+    to top,
+    var(--cco-accent) 0,
+    var(--cco-accent) var(--fill, 30%),
+    #22262e var(--fill, 30%),
+    #22262e 100%
+  );
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cco-rp-hour:hover {
+  outline: 1px solid var(--cco-fg-dim);
+}
+
+.cco-rp-hour-bad {
+  background: linear-gradient(
+    to top,
+    #f7768e 0,
+    #f7768e var(--fill, 30%),
+    #22262e var(--fill, 30%),
+    #22262e 100%
+  );
+}
+
+.cco-rp-hour-all {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid var(--cco-rule);
+  color: var(--cco-fg-dim);
+  font: inherit;
+  font-size: 11px;
+  padding: 0 8px;
+  height: 22px;
+  align-self: flex-end;
+}
+
+.cco-rp-on {
+  outline: 1px solid var(--cco-accent);
+  color: var(--cco-fg);
+}
+
+.cco-rp-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cco-rp-list {
+  margin-top: 10px;
+  max-height: 640px;
+  overflow-y: auto;
+  border-top: 1px solid var(--cco-rule);
+}
+
+.cco-rp-block {
+  display: flex;
+  gap: 10px;
+  padding: 3px 2px;
+  border-bottom: 1px solid #1d2128;
+  font-size: 12.5px;
+  align-items: baseline;
+}
+
+.cco-rp-time {
+  color: #5c6577;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 34px;
+}
+
+.cco-rp-agent {
+  color: #35a389;
+  font-size: 10.5px;
+  flex: 0 0 auto;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cco-rp-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cco-rp-label {
+  color: var(--cco-accent);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cco-rp-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cco-rp-prompt {
+  background: #191e28;
+}
+
+.cco-rp-assistant {
+  color: var(--cco-fg-dim);
+}
+
+.cco-rp-thinking {
+  color: #4d5568;
+  font-style: italic;
+  font-size: 11.5px;
+}
+
+.cco-rp-compaction {
+  color: var(--cco-input);
+  font-size: 11.5px;
+}
+
+.cco-rp-tool {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+  text-align: left;
+}
+
+.cco-rp-toolname {
+  color: var(--cco-cache-read);
+  flex: 0 0 auto;
+}
+
+.cco-rp-toolarg {
+  color: var(--cco-fg-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cco-rp-dur,
+.cco-rp-mark {
+  color: #5c6577;
+  font-size: 10.5px;
+  flex: 0 0 auto;
+}
+
+.cco-rp-mark-bad {
+  color: #f7768e;
+}
+
+.cco-rp-failed .cco-rp-toolname {
+  color: #f7768e;
+}
+
+.cco-rp-error {
+  color: #f7768e;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 2px;
+}
+
+.cco-rp-out {
+  background: #0f1115;
+  border: 1px solid var(--cco-rule);
+  border-radius: 4px;
+  color: var(--cco-fg-dim);
+  font-size: 11px;
+  margin: 4px 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cco-rp-cut {
+  color: #5c6577;
+  font-size: 10.5px;
+}
+
+.cco-rp-more {
+  align-self: center;
+  color: var(--cco-fg-dim);
+  font-size: 10.5px;
+}
+
+.cco-rp-expand {
+  background: transparent;
+  border: 0;
+  color: var(--cco-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10.5px;
+  padding: 0 0 0 6px;
+}
+
+/* --- project filter: which projects the page is about ---------------------- */
+
+.cco-projects {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 18px;
+}
+
+.cco-projects-label {
+  color: var(--cco-fg-dim);
+  font-size: 11.5px;
+  text-transform: lowercase;
+}
+
+.cco-projects-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cco-pchip {
+  align-items: center;
+  background: var(--cco-panel);
+  border: 1px solid var(--cco-rule);
+  border-radius: 999px;
+  color: var(--cco-fg);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 11.5px;
+  gap: 6px;
+  padding: 3px 10px 3px 7px;
+}
+
+.cco-pchip:hover {
+  border-color: var(--cco-fg-dim);
+}
+
+.cco-pchip-dot {
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 9px;
+  width: 9px;
+}
+
+/* Deselected chips keep their swatch but drop out of the foreground, so the
+   set of colours in play stays readable while off-state is unmistakable.
+   Declared AFTER the base rule so the cascade runs in specificity order. */
+.cco-pchip-off {
+  color: #5c6577;
+  opacity: 0.55;
+}
+
+.cco-pchip-off .cco-pchip-dot {
+  opacity: 0.35;
+}
+
+/* The corpus denominator behind a filtered strip: present, but never competing
+   with the live numbers it qualifies. */
+.cco-stat-value.cco-stat-of {
+  color: var(--cco-fg-dim);
+  font-size: 14px;
+  padding-top: 6px;
+}
+
+/* The corpus total behind a filtered attribution bar: present enough to give
+   the filtered bar a denominator, quiet enough not to compete with it. */
+.cco-attr-ghost {
+  background: #313846;
+  border-radius: 3px;
+  display: block;
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+}
+
+.cco-attr-track {
+  position: relative;
+}
+
+.cco-attr-fill {
+  position: relative;
+}
+
+/* --- crossfilter panels: no progress theatre -------------------------------
+ *
+ * `CellView` dims its body and slides an indeterminate blue stripe under it
+ * while a cell recomputes. That is right for slow work — the replay grain is a
+ * 3.2 MB fetch and deserves to say so — and wrong for these four, which are
+ * sub-100ms aggregates re-run continuously while a brush is being dragged. The
+ * stripe strobes through the whole drag and reads as a fault; the honest
+ * feedback is the numbers moving, which they already do.
+ *
+ * Scoped by cell name rather than blanket-disabled, so a genuinely slow cell
+ * still reports itself.
+ */
+[data-cell$="/liveSummary"] > .progress-stripe,
+[data-cell$="/dailyCost"] > .progress-stripe,
+[data-cell$="/attribution"] > .progress-stripe,
+[data-cell$="/sessions"] > .progress-stripe {
+  display: none;
+}
+
+[data-cell$="/liveSummary"] > .cell-body-loading,
+[data-cell$="/dailyCost"] > .cell-body-loading,
+[data-cell$="/attribution"] > .cell-body-loading,
+[data-cell$="/sessions"] > .cell-body-loading {
+  opacity: 1;
+}

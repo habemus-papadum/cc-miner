@@ -1,0 +1,134 @@
+# electron-builder.yml — how cc-miner becomes an installable artifact.
+#
+# Run it through `pnpm pack:mac` / `pnpm pack:linux`, never `electron-builder`
+# bare: two fields in the app's package.json are wrong for a desktop build and
+# are corrected at pack time rather than in the tree (see electron/pack.mjs).
+#   main     ./src/index.ts — the LIBRARY barrel, because this is a workspace
+#            member consumed source-first by its siblings
+#   version  X.Y.Z+dev — the workspace lockstep marker. Semver comparison
+#            IGNORES build metadata, so `0.12.0+dev` and `0.12.0` compare EQUAL
+#            and an updater would never fire. It must be a real version.
+
+appId: com.habemus-papadum.pdum-cc-miner
+productName: pdum-cc-miner
+copyright: Copyright © 2026 Nehal Patel
+
+directories:
+  output: release
+  buildResources: build
+
+# An ALLOWLIST. The default is "everything except a denylist", which here would
+# drag in the whole renderer dependency tree — solid, mosaic, and duckdb-wasm's
+# 143 MB — every byte of which is already compiled into dist/. What the shipped
+# app actually needs at runtime is the built renderer, the shell, the host
+# program, and one native DuckDB.
+files:
+  - dist/**
+  - electron/**
+  - server/**
+  - "!**/*.test.*"
+  - "!electron/dev.mjs" # dev-only: starts a Vite server that is not here
+  - package.json
+  # electron-builder adds the whole production `dependency` tree on its own, and
+  # cc-miner's dependencies are the RENDERER's — solid, mosaic, duckdb-wasm —
+  # because this package is also a library its siblings import source-first.
+  # Measured: 4,481 files, ~166 MB of asar, every byte already compiled into
+  # dist/.
+  #
+  # Excluded by NAME rather than by excluding node_modules wholesale and adding
+  # back what is wanted. That was the first attempt, and it is a trap: it also
+  # drops electron-updater's 8 transitive dependencies, which fail at `require`
+  # time inside a packaged app — the most expensive place to find them. A
+  # denylist can rot as dependencies are added, so `pack.mjs` asserts the asar
+  # size and fails loudly rather than silently shipping the next 100 MB.
+  - "!node_modules/@duckdb/duckdb-wasm/**" # 143 MB of the 166; bundled into dist/
+  - "!node_modules/apache-arrow/**" # ~20 MB, transitively via duckdb-wasm
+  - "!node_modules/@uwdata/**" # mosaic + vgplot + flechette
+  - "!node_modules/@observablehq/**" # plot
+  - "!node_modules/@solidjs/**"
+  - "!node_modules/solid-js/**"
+  - "!node_modules/@habemus-papadum/**" # workspace siblings, all renderer-side
+  - "!node_modules/@types/**" # type declarations; never loaded at runtime
+
+# The native binding cannot be read from inside an asar archive: `duckdb.node`
+# is dlopen'd by path, and it in turn dlopens libduckdb.dylib beside it. Both
+# have to exist as real files on disk.
+asarUnpack:
+  - "**/*.node"
+  - "**/*.dylib"
+  - "**/*.so*"
+
+# Nothing here is built from source — @duckdb/node-bindings ships prebuilt
+# per-platform binaries and N-API keeps them ABI-stable across Electron
+# versions (measured: loads in utilityProcess with no rebuild).
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+
+mac:
+  category: public.app-category.developer-tools
+  # Required for notarization, and it costs four entitlements — see the
+  # justification for each in build/entitlements.mac.plist.
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  # Helper processes get the same holes. The sidecar that loads libduckdb runs
+  # under the app's own binary, but the renderer helpers still need JIT, and a
+  # mismatch here fails at launch rather than at signing.
+  entitlementsInherit: build/entitlements.mac.plist
+  # `Developer ID Application`, never `Apple Development`. The latter is a
+  # local-testing certificate: notarytool rejects it, and Gatekeeper on any
+  # other machine rejects what it signs. Left to its own devices,
+  # electron-builder will happily pick up whichever it finds first.
+  identity: null # set by CI/env; see gatherSigning in electron/pack.mjs
+  # macOS 11+ everywhere the arm64 build can run anyway.
+  minimumSystemVersion: "11.0"
+  gatekeeperAssess: false
+  # zip is NOT redundant beside dmg. electron-updater reads `latest-mac.yml`,
+  # and electron-builder only generates it when a zip target is present — a dmg
+  # alone silently produces a release the updater cannot see.
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+
+linux:
+  category: Development
+  synopsis: Understand your own Claude Code usage
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+
+# ── The update feed ──────────────────────────────────────────────────────────
+# A DEDICATED repo, not the monorepo this lives in, and that is forced rather
+# than chosen: .github/workflows/release.yml already publishes GitHub Releases
+# here at `vX.Y.Z` carrying the .vsix and the Chrome extension. electron-updater
+# asks GitHub for the *latest release* and then reads `latest-mac.yml` out of
+# it — so the first npm release published after a cc-miner one would make every
+# installed app's update check 404. Two feeds cannot share one release list.
+#
+# cc-miner is staged for eviction to its own repo anyway (CLAUDE.md → "The apps/
+# directory"), so its releases belong there from the start.
+#
+# `releaseType: release` because electron-builder's default is DRAFT, and drafts
+# are invisible to the updater — a release that looks published and updates
+# nobody.
+publish:
+  provider: github
+  owner: habemus-papadum
+  repo: cc-miner
+  releaseType: release
+
+dmg:
+  # The conventional drag-to-Applications layout, stated rather than defaulted
+  # so a future background image cannot silently move the drop target.
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

@@ -1,0 +1,31 @@
+{
+  // The Node-side halves of this app: the Vite configs, the DuckDB host, and the
+  // Electron shell. They are NOT in tsconfig.json, whose `include` is `src` —
+  // that one compiles the renderer with DOM libs and Solid's JSX.
+  //
+  // Why this file exists at all: everything it covers runs either in a build
+  // step or inside a PACKAGED app, and a packaged app is the most expensive
+  // place in this project to discover a typo. `checkJs` buys that coverage for
+  // the `.mjs` files, whose types are JSDoc — and they are `.mjs` rather than
+  // `.ts` for a hard reason: Electron's main process executes them verbatim out
+  // of the bundle, where there is no transpiler to run.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true,
+    "lib": ["ES2023"],
+    "types": ["node"]
+    // Module resolution stays on the base's `Bundler`, NOT `NodeNext`. NodeNext
+    // is the truthful model for how Node loads these at runtime, but it also
+    // demands explicit extensions on the `.ts` specifiers Vite resolves without
+    // them — so it would reject the very config files it is here to check.
+  },
+  "include": [
+    "server",
+    "electron",
+    "vite.config.ts",
+    "vite.electron.config.ts",
+    "vite.config.base.ts"
+  ]
+}
