@@ -2,3 +2,19 @@ node_modules/
 dist/
 .DS_Store
 *.log
+release/
+
+# Signing material, as a tripwire rather than a policy. Keys and certificates
+# live OUTSIDE this tree by design (see DEPLOYMENT.md §2) — nothing here should
+# ever match. But `git add -A` is how this repo gets committed, and a .p8 or a
+# .p12 copied in "just for a second" is one command away from being public and
+# unrevokable-in-history. Two of these also keep a key out of the app bundle:
+# electron-builder's `files` allowlist includes electron/ and server/ wholesale.
+*.p8
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+AuthKey_*
+*.keychain
+*.keychain-db
