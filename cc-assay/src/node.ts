@@ -6,6 +6,7 @@
  * reuses `TRAPS` and `DIMENSIONS` for its own UI copy.
  */
 
+export { corpusDir, stagingDir } from "./corpus-dir.ts";
 export * from "./parquet.ts";
 export type { RunOptions, RunResult } from "./run.ts";
 export { loadPriceTable, normalizeCorpus } from "./run.ts";

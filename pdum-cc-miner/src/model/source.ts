@@ -59,44 +59,63 @@ export interface DataSource {
 }
 
 /**
- * Every Parquet file shipped with the app, keyed by its path under `src/data`.
+ * Where corpus bytes come from. Served by whatever is hosting the page — the
+ * Vite dev server, `pnpm preview`, or the packaged app's `app://` handler —
+ * all three from `server/host-runtime.mjs`, all three reading `~/.cache/cc-miner`.
  *
- * `import.meta.glob` rather than named `?url` imports because the layout embeds
- * a host UUID that differs per machine — there is no static path to write. The
- * glob keys ARE the Hive paths, which is exactly what the registration names
- * have to be.
+ * This route replaced an eager `import.meta.glob("../data/**​/*.parquet")`, and
+ * the reason is worth keeping. That glob was resolved at BUILD time, so
+ * `vite build` emitted every Parquet file as a hashed asset and the corpus was
+ * compiled into the application: measured, 121 session replay files in
+ * `dist/assets` and an `app.asar` that grew 89.6 MB → 128.5 MB. A `.dmg` handed
+ * to anyone carried the builder's own transcripts — conversation bodies
+ * included. `src/data` being gitignored protected the repository and nothing
+ * protected the artifact. Now the data is read at RUN time from outside the
+ * repo, and a build cannot contain it because it never sees it.
  */
-const LOCAL_FILES = import.meta.glob("../data/**/*.parquet", {
-  query: "?url",
-  import: "default",
-  eager: true,
-}) as Record<string, string>;
+const CORPUS = "/__corpus";
 
-/** `../data/turns/username=x/…/part0.parquet` → `turns/username=x/…/part0.parquet` */
-function registrationName(globKey: string): string {
-  return globKey.replace(/^\.\.\/data\//, "");
+/** One entry of the corpus `index.json`; see cc-assay's LAYOUT.md. */
+interface Shard {
+  grain: string;
+  /** Hive path relative to the corpus root — also the registration name. */
+  path: string;
+  bytes?: number;
 }
 
 async function localSource(
   db: AsyncDuckDB,
   onProgress: (f: number, label: string) => void,
 ): Promise<Record<string, string[]>> {
-  // Replay files are per-session and read on demand; they must NOT be registered
-  // at boot or local mode would pull the whole replay grain to show one session.
-  const shards = Object.entries(LOCAL_FILES).filter(([k]) => !k.includes("/replay/"));
+  const res = await fetch(`${CORPUS}/index.json`, { cache: "no-store" });
+  if (!res.ok) {
+    // Terminal, and phrased for the person who has not mined yet — this is the
+    // expected state of a fresh checkout, not a malfunction.
+    throw new Error(
+      `no corpus found (GET ${CORPUS}/index.json → ${res.status}).\n` +
+        `Generate one with:  pnpm -C cc-assay mine`,
+    );
+  }
+  const index = (await res.json()) as { shards?: Shard[] };
+  // Replay files are per-session and read on demand; they are not shards and
+  // must not be registered at boot, or local mode would pull the whole replay
+  // grain to show one session.
+  const shards = (index.shards ?? []).filter((s) => !s.path.startsWith("replay/"));
+  if (shards.length === 0) throw new Error("the corpus index lists no shards");
+
   const byGrain: Record<string, string[]> = {};
   let done = 0;
-  for (const [key, url] of shards) {
-    const name = registrationName(key);
-    const grain = name.split("/")[0] ?? "";
-    onProgress(done / shards.length, `loading ${grain}`);
-    const buf = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  for (const shard of shards) {
+    onProgress(done / shards.length, `loading ${shard.grain}`);
+    const r = await fetch(`${CORPUS}/${shard.path}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(`corpus shard missing: ${shard.path} (${r.status})`);
+    const buf = new Uint8Array(await r.arrayBuffer());
     // The registration name carries the FULL Hive path. A flat name would drop
     // the partition columns entirely — they live only in the path, never in the
     // file — and every query naming `username` or `host` would fail to bind.
-    await db.registerFileBuffer(name, buf);
-    byGrain[grain] ??= [];
-    byGrain[grain].push(name);
+    await db.registerFileBuffer(shard.path, buf);
+    byGrain[shard.grain] ??= [];
+    byGrain[shard.grain].push(shard.path);
     done++;
   }
   return byGrain;
@@ -141,10 +160,10 @@ export async function resolveSource(
 
   const byGrain = await localSource(db, onProgress);
   const [manifest, replayIndex] = await Promise.all([
-    fetch(new URL("../data/manifest.json", import.meta.url))
+    fetch(`${CORPUS}/manifest.json`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null),
-    fetch(new URL("../data/replay/index.json", import.meta.url))
+    fetch(`${CORPUS}/replay/index.json`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null),
   ]);

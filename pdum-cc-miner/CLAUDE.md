@@ -8,18 +8,26 @@ Read [README.md](./README.md) for the build, the size budget, and the signing st
 [DEPLOYMENT.md](../DEPLOYMENT.md) for what is measured versus what has never run. This file is
 what to know **before editing**.
 
-## It ships with no data, and that is the first-run state
+## The corpus lives in `~/.cache/cc-miner`, never in the repo or the bundle
 
-`src/data` is gitignored and always will be — a mined corpus carries conversation text, project
-names, branch names and paths. A fresh clone renders `NoData` in `ui/App.tsx`, which is correct,
-not broken. Make your own:
+A mined corpus is personal telemetry — conversation text, project names, branch names, paths. It is
+read at **run time** from outside the tree. A fresh clone renders `NoData` in `ui/App.tsx`, which is
+correct, not broken. Make your own:
 
 ```sh
-pnpm -C ../cc-assay normalize --out ../pdum-cc-miner/src/data
+pnpm -C ../cc-assay mine
 ```
 
-So: **never add a fixture corpus to the repo to make something demoable**, and never treat an
-empty page as a bug to paper over. Tests use fabricated rows, not a corpus.
+`mine` runs both stages. Running only `normalize` is the trap it exists to close: that writes the
+**flat** layout (`turns.parquet`), while the app reads the **Hive** layout in both modes, and
+pointing it at a flat corpus fails obscurely with `no "turns" grain (it reported: … turns.parquet)`.
+
+**Never reintroduce a build-time path to the data.** `src/data` used to reach the renderer via an
+eager `import.meta.glob`, which is resolved by `vite build` — so the corpus was compiled into the
+bundle and a `.dmg` carried the builder's own transcripts (measured: 121 replay files in
+`dist/assets`, `app.asar` 89.6 → 128.5 MB). Bytes now arrive over `/__corpus`, served by whichever
+host is running the page. Also: **never add a fixture corpus to make something demoable**, and never
+treat an empty page as a bug to paper over. Tests use fabricated rows.
 
 ## Two hosts, one renderer — the invariant that costs the most to lose
 

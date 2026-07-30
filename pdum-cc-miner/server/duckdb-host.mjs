@@ -27,7 +27,7 @@ import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { runtimeFile } from "./host-runtime.mjs";
+import { corpusDir, runtimeFile } from "./host-runtime.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(HERE, "..");
@@ -109,7 +109,11 @@ export const LAYOUT_GLOB = "/username=*/host=*/**/*.parquet";
 const FLAT_GLOB = ".parquet";
 
 async function main() {
-  const dataDir = resolve(APP_ROOT, arg("data") ?? "src/data");
+  // `--data` wins; otherwise the shared corpus directory (~/.cache/cc-miner).
+  // It used to default to `src/data` inside the checkout, which is why a corpus
+  // ever lived in the repo at all — and `resolve(APP_ROOT, …)` still applies to
+  // an explicit relative `--data`, so that flag behaves as it always did.
+  const dataDir = arg("data") ? resolve(APP_ROOT, String(arg("data"))) : corpusDir();
   const s3Profile = arg("s3-profile") ?? null;
   const s3Prefix = arg("s3-prefix") ?? null;
   const flat = process.argv.includes("--flat");

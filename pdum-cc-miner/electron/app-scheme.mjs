@@ -35,7 +35,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { net, protocol } from "electron";
-import { hostInfo } from "../server/host-runtime.mjs";
+import { CORPUS_ROUTE, corpusFile, hostInfo } from "../server/host-runtime.mjs";
 import { ensureHost } from "./duckdb-sidecar.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -144,6 +144,25 @@ export function serveApp() {
     // No `/quack` route here. The page talks to the DuckDB host directly, at the
     // address `/__duckdb-host` gave it — see the note in server/host-runtime.mjs
     // for why a same-origin proxy cannot work under a custom scheme.
+
+    // Corpus bytes, for LOCAL mode. The renderer asks the origin for these
+    // exactly as it does in a browser tab, which is what keeps one renderer
+    // running unmodified in both hosts. They come from ~/.cache/cc-miner and
+    // are deliberately NOT in the bundle — see src/model/source.ts.
+    if (pathname.startsWith(`${CORPUS_ROUTE}/`)) {
+      const file = corpusFile(decodeURIComponent(pathname.slice(CORPUS_ROUTE.length + 1)));
+      if (!file) return new Response("refused", { status: 403 });
+      try {
+        const res = await net.fetch(pathToFileURL(file).toString());
+        if (!res.ok) throw new Error(String(res.status));
+        return new Response(res.body, {
+          status: 200,
+          headers: { "content-type": contentType(file), "cache-control": "no-store" },
+        });
+      } catch {
+        return new Response(`no corpus file: ${pathname}`, { status: 404 });
+      }
+    }
 
     const file = resolveAsset(pathname === "/" ? "index.html" : pathname);
     if (!file) return new Response("forbidden", { status: 403 });

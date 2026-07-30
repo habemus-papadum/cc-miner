@@ -4,6 +4,17 @@ dist/
 *.log
 release/
 
+# A corpus must never live in the tree again. It is generated to
+# ~/.cache/cc-miner by `pnpm -C cc-assay mine` and read from there at RUN time;
+# nothing in this repo produces or consumes src/data any more.
+#
+# Kept as a rule anyway, because this exact accident has already happened: the
+# directory's own .gitignore was deleted during a regeneration and 122 files of
+# personal telemetry — conversation text, project names, cwd paths — were
+# committed in its place. That guard lived inside the thing it guarded. This one
+# does not.
+pdum-cc-miner/src/data/
+
 # Signing material, as a tripwire rather than a policy. Keys and certificates
 # live OUTSIDE this tree by design (see DEPLOYMENT.md §2) — nothing here should
 # ever match. But `git add -A` is how this repo gets committed, and a .p8 or a

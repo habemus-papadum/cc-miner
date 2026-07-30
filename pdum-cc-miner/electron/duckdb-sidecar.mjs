@@ -21,10 +21,10 @@
  * host implementation to reason about rather than two that agree today.
  */
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, utilityProcess } from "electron";
-import { readHostRuntime, runtimeFile } from "../server/host-runtime.mjs";
+import { corpusDir, readHostRuntime, runtimeFile } from "../server/host-runtime.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HOST_ENTRY = resolve(HERE, "..", "server", "duckdb-host.mjs");
@@ -38,18 +38,25 @@ let child = null;
 let booting = null;
 
 /**
- * Where a packaged app keeps the corpus it serves.
+ * Where the corpus lives — re-exported from the shared definition so the shell,
+ * the DuckDB host, and the `/__corpus` route cannot disagree.
  *
- * Under `userData`, because everything inside a `.app` bundle is read-only and
- * signed — a corpus written there would break the signature even if the write
- * succeeded. `PDUM_CC_MINER_CORPUS` overrides it, which is how this gets tested
- * against a real corpus before the app can import one itself.
+ * It used to be `<userData>/corpus`, which was right about one thing and wrong
+ * about another. Right: nothing may be written inside a `.app` bundle, which is
+ * read-only and signed. Wrong: it was a THIRD location, known only to the
+ * packaged shell — so host mode in the packaged app looked somewhere the miner
+ * never writes and the renderer never reads. Caught by the smoke test the first
+ * time it ran without a `PDUM_CC_MINER_CORPUS` override:
+ *
+ *     local  ✓ 69,915 marks, 37 charts
+ *     host   ✗ no corpus found at ~/Library/Application Support/pdum-cc-miner/corpus
+ *
+ * `~/.cache/cc-miner` satisfies the real constraint (outside the bundle,
+ * writable) without inventing a per-host path.
  *
  * @returns {string}
  */
-export function corpusDir() {
-  return process.env.PDUM_CC_MINER_CORPUS || join(app.getPath("userData"), "corpus");
-}
+export { corpusDir };
 
 /** The arguments the host is started with, from the environment. */
 function hostArgs() {

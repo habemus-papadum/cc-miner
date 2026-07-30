@@ -13,24 +13,37 @@ told at runtime which shell it is in. Two packages:
 
 ```sh
 pnpm install
-pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data   # make your own corpus
-pnpm -C pdum-cc-miner dev                                       # browser, http://localhost:5173
-pnpm -C pdum-cc-miner dev:electron                              # …or an Electron window
+pnpm -C cc-assay mine              # mine your transcripts → ~/.cache/cc-miner
+pnpm -C pdum-cc-miner dev          # browser, http://localhost:5173
+pnpm -C pdum-cc-miner dev:electron # …or an Electron window
 ```
 
-## It ships with no data, on purpose
+## The corpus lives outside the repo, and outside the app
 
-`pdum-cc-miner/src/data` is gitignored and always will be. A mined corpus carries conversation
-text, project names, branch names and working directory paths — it is personal telemetry, and it
-belongs on your disk and nowhere else. Run `cc-assay` and you have your own in a minute or two.
+A mined corpus carries conversation text, project names, branch names and working directory paths.
+It is personal telemetry, so it lives in **`~/.cache/cc-miner`** — never in the working tree, and
+never inside a build artifact. Both data modes and both hosts read it from there at run time:
+the browser and the packaged app fetch it over `/__corpus`, and the DuckDB host reads the same
+directory directly. `PDUM_CC_MINER_CORPUS` overrides the location; `XDG_CACHE_HOME` is honoured.
 
-Which means a fresh clone starts empty and says so. That is the intended first run.
+This is enforced by construction rather than by rule, which it needs to be. The corpus used to sit
+in `pdum-cc-miner/src/data` and reach the renderer through an **eager `import.meta.glob`** — a
+build-time glob, so `vite build` compiled every Parquet file into the bundle. Measured: 121 session
+replay files in `dist/assets`, and an `app.asar` of 128.5 MB against 89.6 MB without. Anyone handed
+that `.dmg` got the builder's transcripts. The gitignore protected the repo; nothing protected the
+artifact. Now the build never sees the data, so it cannot carry it.
+
+Which means a fresh clone starts empty and says so, pointing at `cc-assay mine`. That is the
+intended first run.
 
 ## Two data modes, declared rather than discovered
 
+Both read the same corpus from `~/.cache/cc-miner`. They differ only in **where the query runs**,
+which is what makes comparing them meaningful:
+
 | mode | where queries run | needs a server |
 | --- | --- | --- |
-| **local** (default) | Parquet you generated, duckdb-wasm in the page | no |
+| **local** (default) | duckdb-wasm in the page, over shards fetched from `/__corpus` | no |
 | **host** | a native DuckDB answering over [Quack](https://duckdb.org/docs/current/quack/overview) | yes — `pnpm serve`, or the packaged app's own sidecar |
 
 Pick with `?source=local` / `?source=host`; the choice is remembered. **There is no fallback in

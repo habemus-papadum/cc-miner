@@ -16,7 +16,7 @@ never been executed; treat it as a plan, not a fact.
 | repo | `habemus-papadum/cc-miner`, public, CI green |
 | packages | `pdum-cc-miner/` (the app), `cc-assay/` (the miner) |
 | upstream | `@habemus-papadum/*` from npm at `^0.12.0` — **measured**: installs, typechecks, tests, and the renderer builds against the published artifacts |
-| data | none, by design. `src/data` is gitignored; run `cc-assay` to make your own |
+| data | none, by construction. The corpus lives in `~/.cache/cc-miner`, outside the repo *and* outside the build; `pnpm -C cc-assay mine` makes your own |
 
 **Measured, end to end:** the packaged macOS app boots and answers in both data modes — local
 (duckdb-wasm in the renderer) and host (a native DuckDB sidecar the app spawns itself). Identical
@@ -24,9 +24,15 @@ numbers in a browser tab, an Electron dev window, and a `.dmg`-installed bundle.
 build, `latest-mac.yml`, and `electron-updater` detection all work. Signing and notarization are
 done — see §2.
 
-Sizes, **with a corpus**: `.app` 495 MB installed (Electron 273, `dist/` 108, `libduckdb.dylib`
-112), `.dmg` 192 MB. This repo ships none, so a build here is smaller and the difference is the
-data, not a regression: `app.asar` 89.6 MB against its 140 MB budget, `.dmg` 167 MB.
+Sizes, and they are **constant** now whatever the size of your history: Electron 273 MB,
+`app.asar` 89.6 MB (`dist/` is 76 MB of it, almost all duckdb-wasm), `libduckdb.dylib` 112 MB, `.dmg` ~155 MB.
+
+They used to vary, because the corpus was compiled into the bundle — `app.asar` measured 89.6 MB
+with no data and 128.5 MB with a real corpus, within ~11 MB of the 140 MB budget in `pack.mjs`.
+Worse than the size: the `.dmg` carried the builder's own transcripts, 121 session replay files
+with conversation bodies among them. `src/data` was gitignored, which protected the repository and
+did nothing for the artifact. The renderer now fetches shards from `/__corpus` at run time, so a
+build never sees the data — app README, "The corpus is never bundled".
 
 ## 2. Signing and notarization — **done, measured 2026-07-30**
 
@@ -148,9 +154,13 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
   shipped app keeps its update feed — only the upload moved. **Unverified**: no release has been
   dispatched, so the `gh release create` / `upload --clobber` path, and the mac+linux matrix both
   landing on one release, have never run.
-- **Whether the sidecar's `utilityProcess` survives a notarized bundle is still untested.** The
-  bundle is notarized now, so this is finally checkable — and it is the half that a launch-only
-  smoke test cannot see (§2.2). Install the `.dmg`, then switch to host mode.
+- **The sidecar under notarization is still the open one.** Local mode is now **measured** in a
+  signed, notarized, hardened-runtime bundle — 69,915 marks over 37 charts, 34,439 turns, 108
+  sessions, read from `~/.cache/cc-miner` through the `app://` corpus route. Host mode has not yet
+  answered in that bundle: the first attempt failed for an unrelated reason (the Electron shell
+  kept a third corpus default, `<userData>/corpus`, which no longer matched where the miner
+  writes), and that is fixed but not re-run at the time of writing. §2.2 is the reason this
+  matters — hardened runtime breaks host mode *only*, so a launch-only check cannot see it.
 - **Auto-update's install half.** Squirrel.Mac verifies the replacement's signature against the
   running app's, which is now satisfiable for the first time. Detection *is* measured (a 0.1.0
   build against a feed advertising 0.9.9 finds it and waits for consent, via

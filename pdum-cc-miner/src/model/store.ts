@@ -644,9 +644,12 @@ export async function ensureReplay(sessionId: string): Promise<string | null> {
   if (!file) throw new Error("this source does not provide replay data");
   if (src?.mode === "local") {
     // Local mode has not fetched this session's bytes yet — replay is the one
-    // grain deliberately left out of the boot registration.
-    const url = new URL(`../data/replay/${sessionId}.parquet`, import.meta.url);
-    const buf = new Uint8Array(await (await fetch(url.href)).arrayBuffer());
+    // grain deliberately left out of the boot registration. Served from the
+    // corpus directory, same as every other shard; see source.ts on why these
+    // are no longer build-time assets.
+    const res = await fetch(`/__corpus/replay/${sessionId}.parquet`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`no replay for this session (${res.status})`);
+    const buf = new Uint8Array(await res.arrayBuffer());
     await e.db.registerFileBuffer(`replay/${sessionId}.parquet`, buf);
   }
   await e.coordinator.exec(

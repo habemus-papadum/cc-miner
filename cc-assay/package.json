@@ -22,6 +22,7 @@
   },
   "scripts": {
     "export": "tsx src/export-cli.ts",
+    "mine": "tsx src/mine-cli.ts",
     "normalize": "tsx src/cli.ts",
     "raw": "tsx src/raw-cli.ts",
     "test": "vitest run",

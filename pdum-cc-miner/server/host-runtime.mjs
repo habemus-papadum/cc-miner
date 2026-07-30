@@ -33,10 +33,72 @@
  * types are JSDoc so `tsconfig.node.json` still checks it.
  */
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Where the page fetches corpus bytes from. Same path in every host, because
+ * the renderer must not know which one it is in.
+ */
+export const CORPUS_ROUTE = "/__corpus";
+
+/**
+ * The corpus directory — the ONE copy of this logic on the app side.
+ *
+ * Deliberately duplicated from `@habemus-papadum/cc-assay`'s `corpusDir()`
+ * rather than imported: this file is executed VERBATIM by the Electron main
+ * process out of a packaged bundle, where `node_modules` has been pruned to the
+ * allowlist in electron-builder.yml and cc-assay is not present. An import here
+ * would typecheck, pass in dev, and fail at `require` time inside the `.dmg` —
+ * the most expensive place to find it. The two must agree; `corpus-dir.test.ts`
+ * pins the rules and this comment is the pointer.
+ *
+ * @returns {string}
+ */
+export function corpusDir() {
+  const override = process.env.PDUM_CC_MINER_CORPUS?.trim();
+  if (override) return override;
+  const xdg = process.env.XDG_CACHE_HOME?.trim();
+  if (xdg) return join(xdg, "cc-miner");
+  return join(homedir(), ".cache", "cc-miner");
+}
+
+/**
+ * Resolve a request path to a file inside the corpus, or null.
+ *
+ * The check is on the RESOLVED path, not the requested one. A corpus lives in
+ * the user's home directory and this route is reachable from any page the dev
+ * server serves, so `../../.ssh/id_rsa` — or its encoded forms, which is why
+ * the caller decodes first — must not escape. `relative()` answering with a
+ * leading `..` is the only reliable way to ask "is this still inside?".
+ *
+ * @param {string} rel
+ * @returns {string | null}
+ */
+export function corpusFile(rel) {
+  if (!rel) return null;
+  const root = resolve(corpusDir());
+  const full = resolve(root, rel);
+  const inside = relative(root, full);
+  if (inside === "" || inside.startsWith("..") || inside.startsWith(`..${sep}`)) return null;
+  // The staging directory holds the FLAT intermediate, which is not part of the
+  // corpus and would only confuse a reader that found it.
+  if (inside.split(sep)[0] === ".staging") return null;
+  return full;
+}
+
+/**
+ * @param {string} file
+ * @returns {string}
+ */
+function contentType(file) {
+  if (file.endsWith(".json")) return "application/json";
+  if (file.endsWith(".parquet")) return "application/vnd.apache.parquet";
+  return "application/octet-stream";
+}
 
 /**
  * Where the host advertises itself.
@@ -133,5 +195,29 @@ export function mountHostRoutes(stack) {
     res.setHeader("content-type", "application/json");
     res.setHeader("cache-control", "no-store");
     res.end(JSON.stringify(hostInfo()));
+  });
+
+  stack.use(CORPUS_ROUTE, (req, res) => {
+    // @ts-expect-error connect's req is typed as `unknown` by the caller.
+    const rel = decodeURIComponent(String(req.url ?? "").split("?")[0] ?? "").replace(/^\//, "");
+    const file = corpusFile(rel);
+    if (!file) {
+      res.statusCode = 403;
+      res.end("refused");
+      return;
+    }
+    let body;
+    try {
+      body = readFileSync(file);
+    } catch {
+      res.statusCode = 404;
+      res.end("not found");
+      return;
+    }
+    res.setHeader("content-type", contentType(file));
+    // The corpus is regenerated in place by `cc-assay mine`, and a cached shard
+    // from a previous mining is indistinguishable from a current one.
+    res.setHeader("cache-control", "no-store");
+    res.end(body);
   });
 }

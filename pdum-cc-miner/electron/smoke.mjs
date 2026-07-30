@@ -8,8 +8,13 @@
  * is worth CI time. This drives the real bundle over CDP and asserts on what it
  * renders, in BOTH data modes:
  *
- *   local  duckdb-wasm in the renderer, over the Parquet shipped in dist/
- *   host   the native DuckDB sidecar, spawned by the app, over src/data
+ *   local  duckdb-wasm in the renderer, over corpus bytes served by the app
+ *   host   the native DuckDB sidecar, spawned by the app, over the same corpus
+ *
+ * Both now read ~/.cache/cc-miner — the corpus is no longer shipped inside the
+ * bundle, so this needs one mined on the machine running it. `pnpm -C cc-assay
+ * mine` produces it; without one, both modes fail with instructions rather than
+ * rendering an empty page.
  *
  * The second is the one that earns its keep on Linux. Local mode exercises no
  * native code at all, so an app whose `duckdb.node` failed to unpack — or whose
@@ -153,9 +158,12 @@ async function main() {
     env: {
       ...process.env,
       PDUM_CC_MINER_CDP_PORT: String(CDP_PORT),
-      // src/data IS a Hive corpus, so it stands in for a user's exported one and
-      // the sidecar has something real to serve. No fixture to build or carry.
-      PDUM_CC_MINER_CORPUS: resolve(APP_ROOT, "src/data"),
+      // No PDUM_CC_MINER_CORPUS override: the point is to exercise the DEFAULT
+      // path the shipped app takes, which is ~/.cache/cc-miner. Pointing this at
+      // a fixture would test a configuration no user runs — and the last version
+      // of this file pointed it at `src/data`, a flat corpus the app cannot read
+      // at all, which is why both modes drew zero marks and reported grains
+      // named `turns.parquet`.
     },
   });
   let childLog = "";
