@@ -13,34 +13,42 @@
  * two paths to the data that agree only while both happen to end at the same
  * engine. A reload is honest and costs a second.
  */
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import type { SourceMode } from "../model/source-mode";
-import { setSourceMode, sourceLabel, sourceMode } from "../model/store";
+import { MODES, setSourceMode, sourceLabel, sourceMode } from "../model/store";
 
-const MODES: ReadonlyArray<{ id: SourceMode; hint: string }> = [
-  { id: "local", hint: "DuckDB-WASM in this page, over corpus shards it fetches" },
-  { id: "host", hint: "a native DuckDB process; the SQL travels, not the table" },
-];
+const HINTS: Record<SourceMode, string> = {
+  local: "DuckDB-WASM in this page, over corpus shards it fetches (dev only)",
+  host: "a native DuckDB process; the SQL travels, not the table",
+};
 
 export function SourceSwitch() {
   const current = () => sourceMode.get();
+  /** Only what this build has — `local` is dev-only; see source-mode.ts. */
+  const offered = () => MODES.map((id) => ({ id, hint: HINTS[id] }));
   return (
     <div class="cco-source">
-      <For each={MODES}>
-        {(m) => (
-          <button
-            type="button"
-            class={`cco-source-btn${current() === m.id ? " is-on" : ""}`}
-            title={m.hint}
-            aria-pressed={current() === m.id ? "true" : "false"}
-            onClick={() => {
-              if (current() !== m.id) setSourceMode(m.id);
-            }}
-          >
-            {m.id}
-          </button>
-        )}
-      </For>
+      {/* One mode is not a choice. A production build has only `host`, and a
+          lone button that cannot be unpressed reads as broken rather than as
+          informative — the provenance label below already says where the data
+          came from, which is the part worth keeping. */}
+      <Show when={offered().length > 1}>
+        <For each={offered()}>
+          {(m) => (
+            <button
+              type="button"
+              class={`cco-source-btn${current() === m.id ? " is-on" : ""}`}
+              title={m.hint}
+              aria-pressed={current() === m.id ? "true" : "false"}
+              onClick={() => {
+                if (current() !== m.id) setSourceMode(m.id);
+              }}
+            >
+              {m.id}
+            </button>
+          )}
+        </For>
+      </Show>
       {/* Provenance, not decoration: in host mode this names the directory or S3
           prefix actually being served, which is the only way to tell a stale
           corpus from the real one. */}

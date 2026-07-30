@@ -207,7 +207,7 @@ what makes comparing their answers meaningful:
 
 | mode | where queries run | needs a server |
 | --- | --- | --- |
-| **local** (default) | duckdb-wasm in the tab, over shards fetched from `/__corpus` | no |
+| **local** (**dev only**) | duckdb-wasm in the tab, over shards fetched from `/__corpus` | no |
 | **host** | a native DuckDB answering over Quack | yes — `pnpm serve`, or the packaged app's own sidecar |
 
 Pick with the switcher in the app header, or `?source=local` / `?source=host`;

@@ -43,10 +43,16 @@ which is what makes comparing them meaningful:
 
 | mode | where queries run | needs a server |
 | --- | --- | --- |
-| **local** (default) | duckdb-wasm in the page, over shards fetched from `/__corpus` | no |
+| **local** (**dev only**) | duckdb-wasm in the page, over shards fetched from `/__corpus` | no |
 | **host** | a native DuckDB answering over [Quack](https://duckdb.org/docs/current/quack/overview) | yes — `pnpm serve`, or the packaged app's own sidecar |
 
-Pick with the switcher in the app header, or `?source=local` / `?source=host`; the choice is
+**`local` is a development mode and is not in shipped builds.** It exists so `pnpm dev` needs no
+second process, and as a cross-check — two independent engines over one corpus must agree. Neither
+reason survives packaging, and it saves nothing to drop: duckdb-wasm is ~77 MB of the bundle and
+host mode needs all of it, because the page still speaks Quack's wire format through it. So a
+release has one engine and one path.
+
+In dev, pick with the switcher in the app header or `?source=local` / `?source=host`; the choice is
 remembered and switching reloads. **There is no fallback in either direction.** Asking for `host`
 with no host running is an error, never a quiet downgrade — a stale local corpus standing in for
 the real one is invisible in the UI and expensive in trust.

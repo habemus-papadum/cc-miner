@@ -30,7 +30,13 @@ import { BUNDLES, instantiateDuckDB } from "../duckdb";
 import { type DurableState, durableState, toggled } from "./durable-state";
 import { plainRow } from "./rows";
 import { type DataSource, resolveSource } from "./source";
-import { browserModeStore, persistMode, resolveMode, type SourceMode } from "./source-mode";
+import {
+  availableModes,
+  browserModeStore,
+  persistMode,
+  resolveMode,
+  type SourceMode,
+} from "./source-mode";
 import {
   type SelectionStats,
   SelectionStatsClient,
@@ -202,9 +208,20 @@ const sourceBox = appScope.durable<{ source: DataSource | null }>("source", () =
 }));
 
 /** The mode this page is running in. Declared, never inferred. */
+/**
+ * The modes THIS BUILD offers — both in dev, host only in production.
+ *
+ * The single place the renderer reads `import.meta.env.DEV`, and it is about
+ * dev-vs-prod, never about which shell it is in. `src/host.ts` answers that at
+ * runtime and must keep doing so: a build flag there would make the browser and
+ * Electron bundles genuinely different and cost the claim that they run the same
+ * app. See `availableModes` for why `local` does not ship.
+ */
+export const MODES: readonly SourceMode[] = availableModes(import.meta.env.DEV);
+
 export const sourceMode = appScope.durableSignal<SourceMode>(
   "sourceMode",
-  resolveMode(typeof location === "undefined" ? "" : location.search, browserModeStore()),
+  resolveMode(typeof location === "undefined" ? "" : location.search, browserModeStore(), MODES),
 );
 
 /**
@@ -232,6 +249,12 @@ export function sourceLabel(): string {
  * reason about than a fresh start.
  */
 export function setSourceMode(mode: SourceMode): void {
+  // Refuse rather than persist a mode this build cannot resolve. Writing it
+  // would leave a value in localStorage that `resolveMode` then has to ignore
+  // on every subsequent load — the setting would look accepted and do nothing.
+  if (!MODES.includes(mode)) {
+    throw new Error(`this build has no \`${mode}\` data source (it has: ${MODES.join(", ")})`);
+  }
   persistMode(mode, browserModeStore());
   if (typeof location !== "undefined") {
     const url = new URL(location.href);

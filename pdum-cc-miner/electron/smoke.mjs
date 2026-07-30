@@ -145,6 +145,11 @@ const FINGERPRINT = `(async () => {
     // has blown this window before and was mistaken for a hard failure.
     loading: !!document.querySelector('.cco-loading'),
     loadingLabel: document.querySelector('.cco-loading-label')?.textContent ?? null,
+    // Which source actually answered, and what the build offers. A packaged app
+    // is a PRODUCTION build, so it must have host only — this is how the test
+    // knows it is checking that rather than being quietly redirected to it.
+    sourceLabel: document.querySelector('.cco-source-label')?.textContent?.trim() ?? null,
+    switchable: document.querySelectorAll('.cco-source-btn').length,
     // Everything the app is prepared to say went wrong, so a failure reports the
     // app's own words rather than only "0 marks".
     error: (document.body.innerText.match(/The loader reported:[\\s\\S]{0,400}/) || [''])[0],
@@ -192,18 +197,47 @@ async function main() {
       }),
     ]);
 
-    for (const mode of ["local", "host"]) {
-      await evaluate(page, `location.href = 'app://pdum-cc-miner/?source=${mode}'; 1`);
+    // A packaged app is a PRODUCTION build, so `local` does not exist in it —
+    // see `availableModes` in src/model/source-mode.ts. Both navigations below
+    // must therefore end in HOST, and the second one is the interesting case:
+    // it asks for a mode this build does not have, which must resolve to host
+    // rather than error or hang.
+    //
+    // This loop used to be `for (const mode of ["local", "host"])` and asserted
+    // marks in each. Left alone, it would now pass by testing host twice and
+    // reporting the first pass as "local" — a check that had silently stopped
+    // checking, which is the failure this file's own history warns about. So the
+    // resolved source is asserted, not assumed.
+    for (const { asked, why } of [
+      { asked: "host", why: "the only mode a shipped build has" },
+      { asked: "local", why: "must fall through to host, not error" },
+    ]) {
+      await evaluate(page, `location.href = 'app://pdum-cc-miner/?source=${asked}'; 1`);
       await new Promise((r) => setTimeout(r, 1500));
       // The navigation replaced the execution context, so re-resolve the target.
       const fresh = await waitForPage(CDP_PORT, 30_000);
       const fp = await evaluate(fresh, FINGERPRINT);
-      const ok = fp.marks >= MIN_MARKS && fp.svgs >= MIN_SVGS;
+      const servedByHost = (fp.sourceLabel ?? "").startsWith("host");
+      const ok =
+        fp.marks >= MIN_MARKS && fp.svgs >= MIN_SVGS && servedByHost && fp.switchable === 0;
       console.log(
-        `  ${ok ? "✓" : "✗"} ${mode.padEnd(5)} ${String(fp.marks).padStart(6)} marks, ` +
-          `${fp.svgs} charts, ${fp.turns} turns, ${fp.sessions} sessions`,
+        `  ${ok ? "✓" : "✗"} ?source=${asked.padEnd(5)} → ${String(fp.sourceLabel).slice(0, 34).padEnd(34)} ` +
+          `${String(fp.marks).padStart(6)} marks, ${fp.svgs} charts, ${fp.turns} turns`,
       );
-      if (!ok) {
+      const mode = `?source=${asked} (${why})`;
+      if (!servedByHost) {
+        failures.push(`${mode}: served by "${fp.sourceLabel}" — a shipped build must use host`);
+      }
+      if (fp.switchable !== 0) {
+        failures.push(
+          `${mode}: ${fp.switchable} source buttons rendered; a production build offers one mode ` +
+            `and must not present a switch`,
+        );
+      }
+      // Only the rendering complaint here — the source and switcher checks
+      // above report themselves, so a single run does not say the same thing
+      // three times.
+      if (fp.marks < MIN_MARKS || fp.svgs < MIN_SVGS) {
         failures.push(
           `${mode}: ${fp.marks} marks over ${fp.svgs} charts ` +
             `(wanted ≥${MIN_MARKS} over ≥${MIN_SVGS})` +
@@ -229,7 +263,10 @@ async function main() {
     console.error(`\n  SMOKE FAILED\n${failures.map((f) => `    ${f}`).join("\n")}`);
     process.exit(1);
   }
-  console.log("\n  smoke passed — the packaged app boots and both data modes answer.");
+  console.log(
+    "\n  smoke passed — the packaged app boots, host mode answers, and `local` is" +
+      "\n  absent from the shipped build rather than merely unused.",
+  );
   process.exit(0);
 }
 

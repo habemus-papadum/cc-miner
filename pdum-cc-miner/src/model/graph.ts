@@ -29,6 +29,7 @@ import {
   brushTime,
   focusSession,
   idleGapMinutes,
+  MODES,
   setAllCollapsed,
   setSourceMode,
   sourceMode,
@@ -618,15 +619,23 @@ export const setSource = action({
   description:
     "Switch the data source between `local` (DuckDB-WASM in the page) and `host` " +
     "(a native DuckDB answering over Quack). Reloads the page. Asking for `host` " +
-    "with no host running is a terminal error, never a quiet downgrade.",
-  params: { mode: "`local` or `host`." },
+    "with no host running is a terminal error, never a quiet downgrade. `local` " +
+    "exists only in dev builds — read `modes` from the result to see what this " +
+    "build actually offers.",
+  params: { mode: "`local` or `host`, whichever this build has." },
   run: async (args?: Record<string, unknown>) => {
     const mode = String(args?.mode ?? "");
     if (!isSourceMode(mode)) throw new Error(`not a data source: ${mode || "(missing)"}`);
+    // Named explicitly rather than left to setSourceMode's throw: an agent that
+    // asked for a mode this build does not have should be told what it CAN ask
+    // for, in the same breath.
+    if (!MODES.includes(mode)) {
+      throw new Error(`this build has no \`${mode}\` data source; it offers: ${MODES.join(", ")}`);
+    }
     const from = sourceMode.get();
-    if (from === mode) return { mode, changed: false };
+    if (from === mode) return { mode, changed: false, modes: [...MODES] };
     setSourceMode(mode);
-    return { mode, changed: true, reloading: true };
+    return { mode, changed: true, reloading: true, modes: [...MODES] };
   },
 });
 
