@@ -138,13 +138,16 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
 
 ### 2.3 Unverified, and expected to bite first
 
-- **A real release has never been published, and `pack.mjs` now refuses to.** With
-  `PDUM_CC_MINER_PUBLISH=always` on a notarizing mac build it exits 2, because the dmg cannot be
-  stapled before it is uploaded — measured in app-builder-lib 26.15.3, `PublishManager` schedules
-  each upload from the `artifactCreated` event and `AsyncTaskManager.addTask` receives an
-  *already-started* promise, so the bytes are in flight before any hook runs. **Fixing this is the
-  next deployment task**: split the release into build → staple → publish. Until then
-  `release.yml` works for `dry_run=true` only.
+- **A real release has never been published**, though the path is now built. `pack.mjs` runs
+  electron-builder with `--publish never` *always* and uploads afterwards itself, via `gh`, in
+  `publishArtifacts()` — because electron-builder schedules each upload from the `artifactCreated`
+  event (`AsyncTaskManager.addTask` receives an already-started promise), so the dmg would go out
+  before its ticket could be stapled. Build → staple → publish, in that order.
+
+  Verified: `app-update.yml` is still written into the bundle under `--publish never`, so the
+  shipped app keeps its update feed — only the upload moved. **Unverified**: no release has been
+  dispatched, so the `gh release create` / `upload --clobber` path, and the mac+linux matrix both
+  landing on one release, have never run.
 - **Whether the sidecar's `utilityProcess` survives a notarized bundle is still untested.** The
   bundle is notarized now, so this is finally checkable — and it is the half that a launch-only
   smoke test cannot see (§2.2). Install the `.dmg`, then switch to host mode.

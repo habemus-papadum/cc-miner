@@ -61,6 +61,13 @@ jobs:
           PDUM_CC_MINER_VERSION: ${{ inputs.version }}
           # Opt-in, and only when this is not a dry run. electron-builder would
           # otherwise publish on its own the moment it detects CI.
+          #
+          # Note that pack.mjs always runs electron-builder with `--publish
+          # never` and does the upload itself afterwards, with `gh` — the dmg's
+          # notarization ticket can only be stapled once electron-builder is
+          # finished with it, and electron-builder starts uploading each artifact
+          # the moment it is created. GH_TOKEN below is what `gh` authenticates
+          # with; both runners ship it preinstalled.
           PDUM_CC_MINER_PUBLISH: ${{ inputs.dry_run && 'never' || 'always' }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Absent → pack.mjs reports "unsigned" and carries on, which is right

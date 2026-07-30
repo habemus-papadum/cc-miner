@@ -234,38 +234,74 @@ function stapleDmgs(notarytoolArgs) {
   return 0;
 }
 
+/**
+ * Upload the finished artifacts to a GitHub Release — the "publish" of
+ * build → staple → publish.
+ *
+ * electron-builder's own publisher cannot be used, and that is the whole reason
+ * this exists. MEASURED in app-builder-lib 26.15.3: `PublishManager` schedules
+ * each upload from the `artifactCreated` event, and `AsyncTaskManager.addTask`
+ * receives an ALREADY-STARTED promise — so the dmg begins uploading the instant
+ * it is built, before `afterAllArtifactBuild` and long before this script
+ * regains control. Its ticket is stapled afterwards (it can only be), so
+ * electron-builder would publish the *unstapled* bytes and leave a dmg that
+ * fails Gatekeeper offline. Hence `--publish never` above, and this instead.
+ *
+ * `electron-builder.yml`'s `publish:` block still matters and must stay: it is
+ * what electron-builder writes into the bundle as `app-update.yml`, which is how
+ * the SHIPPED app knows where to look for updates. Only the upload moves here.
+ *
+ * The release is created if absent and appended to otherwise, because the
+ * release workflow builds macOS and Linux as a matrix and both jobs land on one
+ * release. Whichever gets there first creates it; `--clobber` lets a re-run
+ * replace its own artifacts rather than fail.
+ *
+ * @param {string} tag e.g. `v0.1.0`
+ * @returns {number} exit code
+ */
+function publishArtifacts(tag) {
+  // Everything built, minus electron-builder's own debug dump. `latest-*.yml`
+  // is included and load-bearing: electron-updater reads it out of the release.
+  const files = readdirSync(RELEASE, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name !== "builder-debug.yml")
+    .map((e) => resolve(RELEASE, e.name));
+  if (files.length === 0) {
+    console.error("\n  nothing in release/ to publish");
+    return 1;
+  }
+
+  console.log(`\n  publishing ${files.length} artifact(s) to ${tag} …`);
+  // `|| true` in spirit: a matrix sibling may have created it microseconds ago,
+  // and that is success, not failure. Anything else surfaces on the upload.
+  const created = spawnSync(
+    "gh",
+    ["release", "create", tag, "--title", tag, "--notes", `cc-miner ${tag}`],
+    { encoding: "utf8" },
+  );
+  if (created.status !== 0 && !/already exists/i.test(created.stderr ?? "")) {
+    console.error(`\n  gh release create failed:\n${created.stderr}`);
+    return created.status ?? 1;
+  }
+
+  const up = spawnSync("gh", ["release", "upload", tag, ...files, "--clobber"], {
+    stdio: "inherit",
+  });
+  if (up.status !== 0) return up.status ?? 1;
+  console.log("  ✓ published");
+  return 0;
+}
+
 const version = appVersion();
 const signing = gatherSigning();
 console.log(`\n  cc-miner ${version} → ${target}`);
 if (signing.summary) console.log(signing.summary);
 console.log("");
 
-// ── Publishing versus stapling ───────────────────────────────────────────────
-// These cannot currently be combined, and this refuses rather than shipping the
-// difference. MEASURED in app-builder-lib 26.15.3: PublishManager schedules each
-// upload from the `artifactCreated` event, and `AsyncTaskManager.addTask` is
-// handed an ALREADY-STARTED promise — so the dmg begins uploading the moment it
-// is built, before `afterAllArtifactBuild` and long before this script regains
-// control. There is no hook late enough to get a ticket into the bytes that
-// reach users.
-//
-// A dry run — the release workflow's default — is unaffected. Only a real
-// publish is blocked, and the fix is to split it into build → staple → publish
-// rather than to weaken this into a warning nobody reads.
-if (
-  process.env.PDUM_CC_MINER_PUBLISH === "always" &&
-  target === "mac" &&
-  signing.notarytool != null
-) {
-  console.error(
-    "  refusing to publish: the dmg uploads as soon as it is built, before its\n" +
-      "  notarization ticket can be stapled. The published file would then need an\n" +
-      "  online Gatekeeper check and would fail offline — indistinguishable from an\n" +
-      "  unsigned build. Build and staple first, then publish the stapled artifacts.\n" +
-      "  See stapleDmgs() below.",
-  );
-  process.exit(2);
-}
+// Publishing is OPT-IN, via PDUM_CC_MINER_PUBLISH=always from the release
+// workflow. electron-builder's own default is "publish if it detects CI", which
+// is exactly the kind of implicit behaviour that ships something by accident — a
+// `pnpm pack:mac` on a CI runner should build, not release.
+const publishing = process.env.PDUM_CC_MINER_PUBLISH === "always";
 
 // Wipe the previous build's artifacts. electron-builder overwrites what it
 // rebuilds but removes nothing, so release/ otherwise accumulates every version
@@ -288,12 +324,11 @@ const args = [
   `-c.extraMetadata.main=electron/main.mjs`,
   `-c.extraMetadata.version=${version}`,
   ...signing.args,
-  // Publishing is OPT-IN, via PDUM_CC_MINER_PUBLISH=always from the release
-  // workflow. electron-builder's own default is "publish if it detects CI",
-  // which is exactly the kind of implicit behaviour that ships something by
-  // accident — a `pnpm pack:mac` on a CI runner should build, not release.
+  // NEVER, even when releasing. electron-builder uploads each artifact as it is
+  // created, which is before the dmg can be stapled — see publishArtifacts(),
+  // which does the upload afterwards instead.
   "--publish",
-  process.env.PDUM_CC_MINER_PUBLISH === "always" ? "always" : "never",
+  "never",
   ...process.argv.slice(3),
 ];
 const res = spawnSync("npx", args, { cwd: APP_ROOT, stdio: "inherit" });
@@ -304,6 +339,13 @@ if (res.status !== 0) process.exit(res.status ?? 1);
 if (target === "mac" && signing.notarytool != null) {
   const stapled = stapleDmgs(signing.notarytool);
   if (stapled !== 0) process.exit(stapled);
+}
+
+// Only now, with every artifact in its final bytes, does anything leave this
+// machine. The order is the point: build → staple → publish.
+if (publishing) {
+  const published = publishArtifacts(`v${version}`);
+  if (published !== 0) process.exit(published);
 }
 
 process.exit(assertAsarBudget());

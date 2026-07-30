@@ -120,9 +120,16 @@ Two consequences that are easy to get wrong:
   sha512 and size, so the dmg must not appear in `latest-mac.yml` — an entry there would assert a
   checksum the file no longer has. The updater reads the zip, which nothing touches after signing.
 
-**`pack:mac` refuses to run with `PDUM_CC_MINER_PUBLISH=always`** while notarizing, because uploads
-begin as each artifact is created — before the dmg can be stapled. Publishing needs splitting into
-build → staple → publish; until then, a real macOS release cannot be cut from CI.
+#### Why electron-builder never publishes
+
+`pack.mjs` passes `--publish never` **always**, even when releasing, and uploads afterwards itself
+with `gh` (`publishArtifacts()`). electron-builder schedules each upload from its `artifactCreated`
+event, so the dmg would be in flight before its ticket could be stapled — it would publish the
+unstapled bytes. The order has to be build → staple → publish.
+
+`publish:` in `electron-builder.yml` still matters and must stay: it is what gets written into the
+bundle as `app-update.yml`, which is how the *shipped* app knows where to look for updates.
+Verified that `--publish never` does not suppress it.
 
 #### The entitlement that is actually required — measured, not predicted
 
