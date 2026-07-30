@@ -23,7 +23,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
+import { createConnection, createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DuckDBInstance } from "@duckdb/node-api";
@@ -44,6 +44,45 @@ export const RUNTIME_FILE = runtimeFile();
 
 /** Extensions the host needs. `quack` serves; `httpfs`+`aws` reach S3. */
 const EXTENSIONS = ["quack", "httpfs", "aws"];
+
+/**
+ * Connect to the URL quack says it is serving, and throw if nothing answers.
+ *
+ * Retries briefly: `quack_serve` returns as soon as it has started listening,
+ * and on a loaded machine the accept loop can trail that by a few milliseconds.
+ * A short poll distinguishes "not ready yet" from "not there at all"; without
+ * one this would trade a late failure for a flaky early one.
+ *
+ * @param {string} listenUrl e.g. `http://127.0.0.1:51772`
+ */
+async function assertAccepting(listenUrl) {
+  const { port, hostname } = new URL(listenUrl);
+  let lastErr;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      await new Promise((res, rej) => {
+        const sock = createConnection({ port: Number(port), host: hostname }, () => {
+          sock.end();
+          res(undefined);
+        });
+        sock.on("error", rej);
+        sock.setTimeout(1000, () => {
+          sock.destroy();
+          rej(new Error("timed out connecting"));
+        });
+      });
+      return;
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+  throw new Error(
+    `quack reported serving on ${listenUrl}, but nothing accepts a connection there ` +
+      `(${lastErr instanceof Error ? lastErr.message : lastErr}). ` +
+      `Refusing to advertise an endpoint the page cannot reach.`,
+  );
+}
 
 /** Ask the OS for a free port, then release it for quack to claim. */
 function freePort() {
@@ -210,6 +249,16 @@ async function main() {
     `SELECT * FROM quack_serve('quack:127.0.0.1:${port}', token => '${token}', disable_ssl => true)`,
   );
   const row = served.getRowObjects()[0];
+
+  // Prove the endpoint accepts a connection BEFORE advertising it. quack_serve
+  // returning a row says it started, not that anything can reach it — and the
+  // port handed to it was chosen by binding :0 and releasing, so the number can
+  // be claimed by someone else in the gap. Without this the failure lands in the
+  // renderer as an opaque `net::ERR_CONNECTION_REFUSED` from a worker, three
+  // processes away from the cause, while this log prints a healthy-looking
+  // `quack on …`. Fail here, where the reason is still in hand.
+  const listening = String(row.listen_url);
+  await assertAccepting(listening);
 
   mkdirSync(dirname(RUNTIME_FILE), { recursive: true });
   const runtime = {

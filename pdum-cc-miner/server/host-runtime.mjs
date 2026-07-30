@@ -155,6 +155,28 @@ export function readHostRuntime() {
   }
 }
 
+/**
+ * `host:port` for the quack endpoint, preferring what was actually bound.
+ *
+ * `rt.url` is quack_serve's own `listen_url` (e.g. `http://127.0.0.1:51772`).
+ * `rt.port` is only what the host requested. Falls back to the request when a
+ * runtime file predates `url`, since an old file is better read than refused.
+ *
+ * @param {{port?: number, url?: string}} rt
+ * @returns {string}
+ */
+export function hostPort(rt) {
+  if (typeof rt.url === "string") {
+    try {
+      const u = new URL(rt.url);
+      if (u.port) return `127.0.0.1:${u.port}`;
+    } catch {
+      // Not a URL we can parse; fall through to the requested port.
+    }
+  }
+  return `127.0.0.1:${rt.port}`;
+}
+
 /** What `GET /__duckdb-host` answers. */
 export function hostInfo() {
   const rt = readHostRuntime();
@@ -171,7 +193,15 @@ export function hostInfo() {
     // The endpoint, stated rather than derived. `127.0.0.1` and not `localhost`
     // deliberately: `localhost` may resolve to ::1 first, and quack_serve is
     // bound to the IPv4 loopback only.
-    quackUri: `quack:127.0.0.1:${rt.port}/quack`,
+    //
+    // Built from `url` — what quack_serve REPORTED binding — and only from
+    // `port` if that is missing. They are not the same claim: `port` is what the
+    // host ASKED for, chosen by binding :0 and closing it again, and anything
+    // can take that number in the window before quack claims it. Advertising the
+    // request rather than the result sends the page to an address with nothing
+    // on it, and the renderer can only report `net::ERR_CONNECTION_REFUSED` —
+    // while the host's own log, which prints `listen_url`, looks perfectly fine.
+    quackUri: `quack:${hostPort(rt)}/quack`,
     grains: rt.grains,
     missing: rt.missing,
     source: rt.source,
