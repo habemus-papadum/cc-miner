@@ -161,10 +161,13 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
   Two false alarms on the way, both worth not repeating. The Electron shell kept a **third**
   corpus default (`<userData>/corpus`) that no longer matched where the miner writes — a real bug,
   found because the smoke test stopped overriding `PDUM_CC_MINER_CORPUS` and finally exercised the
-  path the shipped app takes. Then host mode reported `0 marks` once more and looked broken: it was
-  the **first host-mode boot of a fresh bundle downloading DuckDB's extensions**, which outran the
-  90 s settle window. Nothing was wrong. `smoke.mjs` now says "still LOADING when the window
-  closed" instead of reporting a timeout as a hard failure.
+  path the shipped app takes. Then host mode reported `0 marks` once more and looked broken: it passed
+  unchanged on the next run, so the build was fine and the report was not. **The cause was never
+  established.** The obvious suspect — DuckDB fetching extensions on first use — is now measured
+  at 62 MB and ~1.8 s cold on a fast link (23 ms warm), nowhere near a 90 s window, so that
+  explanation does not hold here even though it would on a slow connection. `smoke.mjs` now
+  reports "still LOADING when the window closed" rather than presenting a timeout as a hard
+  failure, which is the part that actually cost time.
 - **Auto-update's install half.** Squirrel.Mac verifies the replacement's signature against the
   running app's, which is now satisfiable for the first time. Detection *is* measured (a 0.1.0
   build against a feed advertising 0.9.9 finds it and waits for consent, via
@@ -234,3 +237,27 @@ gh workflow run release.yml -f canary=true    # in pdum_aiui: X.Y.Z-canary.<sha>
 - `DuckDB` fetches its extensions from `extensions.duckdb.org` on first query — a third-party
   runtime dependency on the *first-query* path. Scoped as acceptable (an open connection is
   assumed), but it is why a CDN outage looks like a data bug.
+
+## 6. Timings, measured 2026-07-30
+
+On this machine (M-series Mac, fast link), against a 500-file / 639 MB transcript corpus:
+
+| step | time | note |
+| --- | --- | --- |
+| `pnpm -C cc-assay mine --replay` | **5.8 s** wall | 189,401 records → 34,366 turns → 10 Hive shards |
+| ↳ normalize stage | 4.5 s | scan + dedup + price + write flat Parquet |
+| ↳ export stage | ~1.3 s | flat → Hive, via DuckDB `COPY … PARTITION_BY` |
+| DuckDB extensions, **cold** | **1.8 s** | 62 MB from extensions.duckdb.org: quack, httpfs, aws |
+| DuckDB extensions, warm | 23 ms | every boot after the first |
+
+Two things worth carrying:
+
+- **Mining is not the slow part.** 5.8 s for a corpus of this size means re-mining is cheap enough
+  to do casually; there is no need to design around incremental updates yet. It is roughly linear
+  in transcript bytes, so budget ~1 s per 100 MB of `~/.claude`.
+- **62 MB of extensions is fetched on first host-mode use**, and nothing is bundled — see the note
+  in `server/duckdb-host.mjs`. Under two seconds here; on a slow or captive connection this is
+  minutes of spinner on the first query, and on an offline machine host mode simply does not start.
+  Bundling them is the obvious fix and is **not** done: DuckDB verifies its own signature over each
+  extension file, and `codesign` appends to the Mach-O, so a bundled copy inside a signed `.app`
+  fails its own check (§2.2). Any fix has to solve that first.

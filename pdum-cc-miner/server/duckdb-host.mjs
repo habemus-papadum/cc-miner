@@ -122,9 +122,17 @@ async function main() {
   const conn = await instance.connect();
 
   for (const ext of EXTENSIONS) {
-    // INSTALL reaches extensions.duckdb.org on first run. A packaged build sets
-    // extension_directory to the bundled copies and skips this (verified: with
-    // autoinstall/autoload off, LOAD alone works from a bundled directory).
+    // INSTALL reaches extensions.duckdb.org whenever the cache is cold, and
+    // that includes a packaged build: `extension_directory` is set NOWHERE and
+    // the .app bundles ZERO `.duckdb_extension` files (checked). A previous
+    // version of this comment claimed the opposite — that packaged builds load
+    // bundled copies — which was a plan, never an implementation, and would
+    // have told a reader the app makes no network call when it does.
+    //
+    // MEASURED into a throwaway extension_directory: 62 MB, ~1.8 s cold on a
+    // fast link, 23 ms warm. Fast here, minutes on a bad connection — and it
+    // sits on the FIRST-QUERY path, which is why a CDN outage presents as a
+    // data bug (DEPLOYMENT.md §5).
     await conn.run(`INSTALL ${ext}`).catch(() => {});
     await conn.run(`LOAD ${ext}`);
   }

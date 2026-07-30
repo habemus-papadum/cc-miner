@@ -140,9 +140,12 @@ const FINGERPRINT = `(async () => {
     turns: num('turns'),
     sessions: num('sessions'),
     // Still on the spinner? Then this is SLOW, not broken — and the two look
-    // identical from a mark count alone. The first host-mode boot of a fresh
-    // bundle downloads DuckDB's extensions from extensions.duckdb.org, which
-    // has blown this window before and was mistaken for a hard failure.
+    // identical from a mark count alone. Host mode reported 0 marks once on a
+    // freshly packaged bundle and passed unchanged on the next run, so the
+    // build was fine and the report was not. The cause was never established:
+    // the obvious suspect, DuckDB fetching its extensions on first use, is
+    // MEASURED at 1.8 s / 62 MB on a fast link — nowhere near this window,
+    // though minutes on a slow one. Report the state, do not guess the reason.
     loading: !!document.querySelector('.cco-loading'),
     loadingLabel: document.querySelector('.cco-loading-label')?.textContent ?? null,
     // Which source actually answered, and what the build offers. A packaged app
@@ -246,8 +249,9 @@ async function main() {
             // sent one debugging session after a bug that did not exist.
             (fp.loading
               ? `\n    still LOADING when the window closed${fp.loadingLabel ? ` ("${fp.loadingLabel}")` : ""} —` +
-                `\n    not necessarily broken. A first host-mode boot downloads DuckDB extensions` +
-                `\n    from extensions.duckdb.org; re-run once the cache is warm before digging.`
+                `\n    slow, not necessarily broken. Re-run before digging: this has resolved on a` +
+                `\n    second run before. On a slow link, suspect DuckDB's first-use extension` +
+                `\n    fetch (62 MB; 1.8 s here, minutes on a bad connection).`
               : "") +
             (fp.error ? `\n    ${fp.error}` : ""),
         );
