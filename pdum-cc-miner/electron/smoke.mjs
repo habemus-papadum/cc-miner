@@ -139,6 +139,12 @@ const FINGERPRINT = `(async () => {
     svgs: document.querySelectorAll('svg').length,
     turns: num('turns'),
     sessions: num('sessions'),
+    // Still on the spinner? Then this is SLOW, not broken — and the two look
+    // identical from a mark count alone. The first host-mode boot of a fresh
+    // bundle downloads DuckDB's extensions from extensions.duckdb.org, which
+    // has blown this window before and was mistaken for a hard failure.
+    loading: !!document.querySelector('.cco-loading'),
+    loadingLabel: document.querySelector('.cco-loading-label')?.textContent ?? null,
     // Everything the app is prepared to say went wrong, so a failure reports the
     // app's own words rather than only "0 marks".
     error: (document.body.innerText.match(/The loader reported:[\\s\\S]{0,400}/) || [''])[0],
@@ -200,7 +206,16 @@ async function main() {
       if (!ok) {
         failures.push(
           `${mode}: ${fp.marks} marks over ${fp.svgs} charts ` +
-            `(wanted ≥${MIN_MARKS} over ≥${MIN_SVGS})${fp.error ? `\n    ${fp.error}` : ""}`,
+            `(wanted ≥${MIN_MARKS} over ≥${MIN_SVGS})` +
+            // Say WHICH failure this is. "0 marks" with the spinner still up is
+            // a timeout, not a broken build, and reporting them identically
+            // sent one debugging session after a bug that did not exist.
+            (fp.loading
+              ? `\n    still LOADING when the window closed${fp.loadingLabel ? ` ("${fp.loadingLabel}")` : ""} —` +
+                `\n    not necessarily broken. A first host-mode boot downloads DuckDB extensions` +
+                `\n    from extensions.duckdb.org; re-run once the cache is warm before digging.`
+              : "") +
+            (fp.error ? `\n    ${fp.error}` : ""),
         );
       }
     }

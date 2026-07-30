@@ -154,13 +154,17 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
   shipped app keeps its update feed — only the upload moved. **Unverified**: no release has been
   dispatched, so the `gh release create` / `upload --clobber` path, and the mac+linux matrix both
   landing on one release, have never run.
-- **The sidecar under notarization is still the open one.** Local mode is now **measured** in a
-  signed, notarized, hardened-runtime bundle — 69,915 marks over 37 charts, 34,439 turns, 108
-  sessions, read from `~/.cache/cc-miner` through the `app://` corpus route. Host mode has not yet
-  answered in that bundle: the first attempt failed for an unrelated reason (the Electron shell
-  kept a third corpus default, `<userData>/corpus`, which no longer matched where the miner
-  writes), and that is fixed but not re-run at the time of writing. §2.2 is the reason this
-  matters — hardened runtime breaks host mode *only*, so a launch-only check cannot see it.
+- **~~The sidecar under notarization~~ — RESOLVED, measured 2026-07-30.** `pnpm smoke` passes on a signed, notarized, hardened-runtime bundle: local **and** host both render 69,915 marks over 37 charts (34,439 turns, 108 sessions). `utilityProcess` spawns, `libduckdb.dylib` loads, and the runtime-downloaded `quack.duckdb_extension` dlopens — the exact thing §2.2 exists to permit. Both modes read `~/.cache/cc-miner`, which is why the numbers match.
+  §2.2 is why this needed checking at all: hardened runtime breaks host mode *only*, so a
+  launch-only test cannot see it.
+
+  Two false alarms on the way, both worth not repeating. The Electron shell kept a **third**
+  corpus default (`<userData>/corpus`) that no longer matched where the miner writes — a real bug,
+  found because the smoke test stopped overriding `PDUM_CC_MINER_CORPUS` and finally exercised the
+  path the shipped app takes. Then host mode reported `0 marks` once more and looked broken: it was
+  the **first host-mode boot of a fresh bundle downloading DuckDB's extensions**, which outran the
+  90 s settle window. Nothing was wrong. `smoke.mjs` now says "still LOADING when the window
+  closed" instead of reporting a timeout as a hard failure.
 - **Auto-update's install half.** Squirrel.Mac verifies the replacement's signature against the
   running app's, which is now satisfiable for the first time. Detection *is* measured (a 0.1.0
   build against a feed advertising 0.9.9 finds it and waits for consent, via
