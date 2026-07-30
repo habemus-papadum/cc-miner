@@ -38,8 +38,8 @@ and the invariant results.
 lenient accessors plus a `TRAPS` registry. Reading is total and never throws
 (Claude Code shipped 28 builds in the five weeks of the baseline corpus — a
 validating parser would have broken repeatedly); *noticing* drift is a separate
-offline job, and it did not come along with the eviction — the census/diff scripts
-it used live in `pdum_aiui` under `exploration/cc-usage/`.
+offline job, and it does not live here — the census/diff scripts it uses are in
+`pdum_aiui` under `exploration/cc-usage/`.
 
 The traps that decide the design, each pinned by a test in `normalize.test.ts`:
 

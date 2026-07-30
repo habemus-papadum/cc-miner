@@ -153,9 +153,9 @@ process.exit(assertAsarBudget());
 /**
  * Find the app.asar this run produced, without naming the product.
  *
- * The path used to be spelled `release/mac-arm64/cc-miner.app/…`, and eviction
- * renamed `productName` to `pdum-cc-miner` — after which the path matched
- * nothing, `assertAsarBudget` took its "nothing built here" branch, and the
+ * The path used to be spelled `release/mac-arm64/cc-miner.app/…`. When
+ * `productName` became `pdum-cc-miner` the path stopped matching anything,
+ * `assertAsarBudget` took its "nothing built here" branch, and the
  * tripwire below reported success without ever weighing anything. That is the
  * precise failure it exists to prevent, so the name is discovered rather than
  * written down: rename the product again and this still finds it.

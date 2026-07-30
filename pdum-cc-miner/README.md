@@ -2,11 +2,10 @@
 
 Your own Claude Code usage: cost per turn, where it goes, and whether a session was time well spent.
 
-The eviction from `pdum_aiui` has happened: the `@habemus-papadum/*` packages now arrive from
-**npm** at `^0.12.0` rather than through `workspace:^`, so a one-line fix upstream is a publish
-away. `pnpm link:up` points them back at a sibling checkout's source when that matters — see the
+The `@habemus-papadum/*` packages it builds on come from **npm** at `^0.12.0`; `pnpm link:up`
+points them at a local checkout's source when a change has to span both — see the
 [root README](../README.md#developing-against-the-aiui-packages-source). Its data comes from
-[`cc-assay`](../cc-assay) next door, which is still a workspace sibling.
+[`cc-assay`](../cc-assay) next door, a workspace sibling.
 
 ## Two hosts, one app
 

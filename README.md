@@ -53,21 +53,19 @@ notarization requirements, and the one entitlement that turns out to be load-bea
 account is all that is missing), what is measured versus what has never run, and the plan to
 extract the Electron and DuckDB/Mosaic infrastructure into their own packages.
 
-## Provenance
+## The aiui dependency
 
-Evicted from [`habemus-papadum/pdum_aiui`](https://github.com/habemus-papadum/pdum_aiui) by its
-`scripts/evict.mjs`, which rewrites the `workspace:^` dependencies to published npm ranges. The
-`@habemus-papadum/*` packages this depends on are consumed from npm at the versions in each
-manifest.
+The app is built on [`@habemus-papadum/*`](https://github.com/habemus-papadum/pdum_aiui) —
+`aiui-viz` for the cell graph, the control surface and the agent tools, `aiui-source-processor`
+for the build-time compiler pass. They are consumed from **npm** at the versions in each manifest.
 
-The root `devDependencies` are carried wholesale from the source repo and are a superset — worth
-pruning once the toolchain here settles.
+The root `devDependencies` are a superset of what this repo actually uses — worth pruning once the
+toolchain here settles.
 
 ## Developing against the aiui packages' source
 
-The cost of this repo being separate from `pdum_aiui` is that `@habemus-papadum/*`
-now arrives from npm, so a one-line fix upstream is a publish away. Three levers,
-smallest first:
+Because `@habemus-papadum/*` arrives from npm, a one-line fix in one of them is otherwise a
+publish away. Three levers, smallest first:
 
 ```sh
 pnpm link:up                     # every aiui dep → ../pdum_aiui source
@@ -79,8 +77,8 @@ pnpm unlink:up                   # back to the published versions
 
 `link:up` defaults to a **sibling** `../pdum_aiui`, which is the layout to keep.
 It writes a fenced `overrides` block into `pnpm-workspace.yaml` and reinstalls;
-the linked package then resolves to its `src/index.ts` and HMR works as it did
-inside the monorepo. Verified: typecheck, build and tests all pass linked.
+the linked package then resolves to its `src/index.ts`, with HMR straight from
+source. Verified: typecheck, build and tests all pass linked.
 
 Overrides rather than `pnpm link` on purpose — an override redirects *every*
 resolution of a name, direct or transitive, so it cannot produce two copies of
@@ -91,4 +89,7 @@ machine. `pnpm upstream:check` runs in CI and fails the build if one survives
 into a commit, so the mistake is a sentence rather than a broken clone.
 
 For anything longer-lived than an afternoon, prefer publishing a canary from
-`pdum_aiui` (`gh workflow run canary.yml`) and depending on the real version.
+`pdum_aiui` — `gh workflow run release.yml -f canary=true`, which publishes
+`X.Y.Z-canary.<sha>` under the `canary` dist-tag — and depend on that real
+version. (Not a `canary.yml`: npm trusted publishing matches on the exact
+workflow filename, so the canary has to live inside `release.yml`.)

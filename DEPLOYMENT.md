@@ -136,8 +136,8 @@ know nothing about cc-miner and should not live here.
 **The reusability test is a second consumer, not an assertion.** A trivial second app must run on
 these three packages before extraction counts as done.
 
-Extraction is also gated: they must be published before an evicted repo can depend on them, which
-is what `pnpm evict:check` enforces upstream.
+Extraction is also gated on publishing: this repo consumes those packages from npm, so each one
+has to be released before anything here can depend on it.
 
 ## 4. Working with upstream while doing this
 
@@ -161,8 +161,7 @@ gh workflow run release.yml -f canary=true    # in pdum_aiui: X.Y.Z-canary.<sha>
   repo has none. Run it manually after `pack:dir`.
 - Two size levers, measured and deliberately not taken: the unused 41 MB `mvp` duckdb-wasm bundle,
   and 28 MB of replay Parquet that only local mode reads.
-- The root `devDependencies` were carried wholesale from `pdum_aiui` and are a superset worth
-  pruning.
+- The root `devDependencies` are a superset of what this repo uses, and worth pruning.
 - `DuckDB` fetches its extensions from `extensions.duckdb.org` on first query — a third-party
   runtime dependency on the *first-query* path. Scoped as acceptable (an open connection is
   assumed), but it is why a CDN outage looks like a data bug.
