@@ -122,6 +122,28 @@ publish:
   releaseType: release
 
 dmg:
+  # Sign the disk image itself, not just the app inside it. Without this the dmg
+  # carries a notarization ticket and no signature, and Apple's own documented
+  # check for a downloaded disk image —
+  #   spctl -a -t open --context context:primary-signature <dmg>
+  # — answers `rejected: no usable signature`. MEASURED: that is exactly what an
+  # unsigned dmg reported here, while the app inside it was accepted. Signing
+  # runs before the blockmap and before the publish event, so the ordering that
+  # matters (sign -> notarize -> staple) holds.
+  sign: true
+  # Keep the dmg OUT of latest-mac.yml, and this is load-bearing rather than
+  # tidiness. `pack.mjs` staples the notarization ticket into the dmg after
+  # electron-builder has finished with it — which is the only time it can — and
+  # that appends ~2 KB. MEASURED: the recorded sha512 and size then describe a
+  # file that no longer exists (174,660,020 -> 174,662,079 bytes), and the
+  # blockmap beside it is stale too. A feed asserting a checksum the artifact
+  # does not have is worse than no entry at all.
+  #
+  # Nothing is lost. electron-updater downloads what `path:` names, which is the
+  # zip — and the zip needs no stapling because electron-builder staples the
+  # .app BEFORE wrapping it, so the zip's payload is already notarized. The dmg
+  # is a human download, not an update payload.
+  writeUpdateInfo: false
   # The conventional drag-to-Applications layout, stated rather than defaulted
   # so a future background image cannot silently move the drop target.
   contents:
