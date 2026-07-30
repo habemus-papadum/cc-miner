@@ -34,7 +34,7 @@ with conversation bodies among them. `src/data` was gitignored, which protected 
 did nothing for the artifact. The renderer now fetches shards from `/__corpus` at run time, so a
 build never sees the data — app README, "The corpus is never bundled".
 
-## 2. Signing and notarization — **done, measured 2026-07-30**
+## 2. Signing, notarization and release — **done, measured 2026-07-30**
 
 A locally built `.dmg` and `.zip` are now signed, notarized, and stapled, and Gatekeeper accepts
 both. This section used to say a `Developer ID Application` certificate was the only thing missing;
@@ -144,16 +144,16 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
 
 ### 2.3 Unverified, and expected to bite first
 
-- **A real release has never been published**, though the path is now built. `pack.mjs` runs
-  electron-builder with `--publish never` *always* and uploads afterwards itself, via `gh`, in
-  `publishArtifacts()` — because electron-builder schedules each upload from the `artifactCreated`
-  event (`AsyncTaskManager.addTask` receives an already-started promise), so the dmg would go out
-  before its ticket could be stapled. Build → staple → publish, in that order.
+- **~~A real release has never been published~~ — DONE. `v0.1.0` shipped from CI, 2026-07-30.**
+  Run 30559678800: dmg, zip, AppImage, deb and both `latest-*.yml` on the Releases tab.
 
-  Verified: `app-update.yml` is still written into the bundle under `--publish never`, so the
-  shipped app keeps its update feed — only the upload moved. **Unverified**: no release has been
-  dispatched, so the `gh release create` / `upload --clobber` path, and the mac+linux matrix both
-  landing on one release, have never run.
+  Verified by downloading the **published** dmg rather than trusting the build log: the ticket
+  staples and validates offline, Gatekeeper says `accepted / source=Notarized Developer ID`, and
+  the app dragged out of it is accepted with `flags=0x10000(runtime)` and the full Apple chain.
+  `latest-mac.yml` names the zip only — the dmg appears zero times, as intended.
+
+  The matrix race resolved as designed: linux published first (3 artifacts), mac hit the
+  `already exists` branch and uploaded its 4 alongside.
 - **~~The sidecar under notarization~~ — RESOLVED, measured 2026-07-30.** `pnpm smoke` passes on a signed, notarized, hardened-runtime bundle: local **and** host both render 69,915 marks over 37 charts (34,439 turns, 108 sessions). `utilityProcess` spawns, `libduckdb.dylib` loads, and the runtime-downloaded `quack.duckdb_extension` dlopens — the exact thing §2.2 exists to permit. Both modes read `~/.cache/cc-miner`, which is why the numbers match.
   §2.2 is why this needed checking at all: hardened runtime breaks host mode *only*, so a
   launch-only test cannot see it.
@@ -169,8 +169,12 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
   running app's, which is now satisfiable for the first time. Detection *is* measured (a 0.1.0
   build against a feed advertising 0.9.9 finds it and waits for consent, via
   `PDUM_CC_MINER_UPDATE_URL`); the install half needs two signed builds and a feed between them.
-- **Linux has never been built.** AppImage + deb are configured and the DuckDB linux bindings exist
-  on npm and in the lockfile, but no artifact has been produced. Needs a Linux runner.
+- **Linux BUILDS but has never been RUN.** AppImage and deb are produced by CI and published, and
+  `@duckdb/node-bindings-linux-x64` resolves correctly on the ubuntu runner (the "not bundled"
+  warning there lists every platform *except* linux-x64 — the inverse of what macOS reports). What
+  nobody has done is launch either artifact. **Host mode on Linux is the real unknown**: it needs
+  `libduckdb.so` to have been `asarUnpack`ed and the sidecar to spawn, and neither can be checked
+  from macOS. `pnpm smoke` on a Linux box is the test.
 - **x64 macOS** is not configured — arm64 only. The `@duckdb/node-bindings-darwin-x64` package
   exists, so it is a target-list change plus a build.
 
