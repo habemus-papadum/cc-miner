@@ -1,9 +1,9 @@
 /**
- * styles.css — the ledger page's look, in the demos' shared dark-journal idiom.
+ * styles.css — cc-miner's look, in the aiui demos' shared dark-journal idiom.
  *
  * Every class is `cco-` prefixed (or nested under `.cco`) so this page can be
  * mounted beside another aiui app in one document without leaking style onto
- * it — the same discipline demos/gears uses with its `.gears` root class.
+ * it — the discipline pdum_aiui's demos/gears uses with its `.gears` root class.
  */
 
 .cco {

@@ -3,7 +3,7 @@
  * `cc-assay raw` — stage 1. Ingest this machine's transcripts into a per-host
  * raw Parquet set.
  *
- *   pnpm -C apps/cc-assay raw -- --out ~/.cache/aiui/cc-raw
+ *   pnpm -C cc-assay raw -- --out ~/.cache/aiui/cc-raw
  *
  * The output directory is one host's artifact: `raw.parquet`, `files.parquet`
  * and `host.json`. It is meant to travel — copy several hosts' directories

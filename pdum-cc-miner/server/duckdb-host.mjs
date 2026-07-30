@@ -6,7 +6,8 @@
  * the renderer's duckdb-wasm is reduced to a protocol client. Why: `ATTACH`-ing
  * a remote catalog performs NO pushdown — a bare `count(*)` over a 272 MB table
  * moved 5.26 GB — while `quack_query`, which sends the SQL as a string, answered
- * the same query in 5 ms with ~0 bytes. See docs/guide/duckdb-mosaic.md.
+ * the same query in 5 ms with ~0 bytes. Written up upstream, in pdum_aiui's
+ * docs/guide/duckdb-mosaic.md.
  *
  * It is deliberately NOT Electron-specific. `pnpm dev` (browser) needs it just
  * as much as `pnpm dev:electron` does, so it is a plain Node program that either
@@ -16,7 +17,7 @@
  * `quack_serve` rejects port 0, so there is no OS-assigned port to ask for. We
  * therefore pick a free one HERE (bind, read, release) and hand quack the
  * number — but the port is never the thing anyone looks up. Discovery is the
- * runtime file this writes, for the reason recorded in
+ * runtime file this writes, for the reason recorded upstream in pdum_aiui's
  * docs/proposals/deployment-shapes.md §1.9: a hardcoded port does not fail
  * loudly when contended, it silently routes callers to whoever got there first.
  */

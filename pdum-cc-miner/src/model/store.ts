@@ -41,8 +41,8 @@ import {
 
 /**
  * The app's instance scope: ONE slug qualifying every declaration — controls
- * ("ledger/petals"), durable keys, cells, actions — and naming the
- * graph key and the agent toolkit. Thread it through everything you declare
+ * ("pdum-cc-miner/idleGapMinutes"), durable keys, cells, actions — and naming
+ * the graph key and the agent toolkit. Thread it through everything you declare
  * (`control({ scope: appScope, … })`, `appScope.durable(…)`,
  * `cell(deps, compute, { scope: appScope })`, `action({ scope: appScope, … })`):
  * it is what lets this app share a document with other aiui apps — mounted in
@@ -527,8 +527,8 @@ function loadManifest(): void {
  * app did at ~20 call sites — creates a second path to the data that agrees
  * with the first only while both happen to end at the same in-page instance.
  * Swap the connector and one path follows while the other keeps talking to a
- * database that no longer has the rows. See docs/proposals/deployment-shapes.md
- * §2.1.
+ * database that no longer has the rows. See, upstream, pdum_aiui's
+ * docs/proposals/deployment-shapes.md §2.1.
  *
  * Arrow, not `{ type: 'json' }`. It is Mosaic's default and its typed result,
  * and under a socket connector the result encoding IS the wire format — JSON

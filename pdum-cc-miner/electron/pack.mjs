@@ -3,7 +3,7 @@
  *
  *   node electron/pack.mjs mac      → release/*.dmg, release/*.zip, latest-mac.yml
  *   node electron/pack.mjs linux    → release/*.AppImage, release/*.deb, latest-linux.yml
- *   node electron/pack.mjs dir      → release/mac-arm64/cc-miner.app (fast, unpackaged)
+ *   node electron/pack.mjs dir      → release/mac-arm64/pdum-cc-miner.app (fast, unpackaged)
  *
  * This wrapper exists for ONE reason worth stating plainly: two fields in
  * cc-miner's package.json are correct for a workspace member and wrong for a
@@ -12,18 +12,19 @@
  *   main      `./src/index.ts` — the library barrel. Every sibling in this
  *             workspace consumes cc-miner source-first through it; a desktop
  *             build needs `electron/main.mjs` instead.
- *   version   `X.Y.Z+dev` — the workspace lockstep marker, owned exclusively by
- *             the release pipeline (AGENTS.md). It is also a semver TRAP:
- *             build metadata is ignored by semver comparison, so `0.12.0+dev`
- *             and `0.12.0` compare EQUAL and electron-updater would decide
- *             there is nothing newer. Forever.
+ *   version   the workspace lockstep marker, not the artifact's version — a
+ *             release supplies the real one via PDUM_CC_MINER_VERSION. Rewritten
+ *             unconditionally because of a semver TRAP: build metadata is
+ *             ignored by semver comparison, so a `X.Y.Z+dev` marker of the kind
+ *             this repo inherited compares EQUAL to `X.Y.Z` and
+ *             electron-updater would decide there is nothing newer. Forever.
  *
  * `extraMetadata` rewrites both in the package.json that goes INTO the bundle,
  * leaving the repo's own untouched. That is the whole trick, and it is why this
  * script exists rather than a line in a README telling someone to remember.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -150,6 +151,37 @@ if (res.status !== 0) process.exit(res.status ?? 1);
 process.exit(assertAsarBudget());
 
 /**
+ * Find the app.asar this run produced, without naming the product.
+ *
+ * The path used to be spelled `release/mac-arm64/cc-miner.app/…`, and eviction
+ * renamed `productName` to `pdum-cc-miner` — after which the path matched
+ * nothing, `assertAsarBudget` took its "nothing built here" branch, and the
+ * tripwire below reported success without ever weighing anything. That is the
+ * precise failure it exists to prevent, so the name is discovered rather than
+ * written down: rename the product again and this still finds it.
+ *
+ * @returns {string | null}
+ */
+function findAsar() {
+  const release = resolve(APP_ROOT, "release");
+  if (!existsSync(release)) return null;
+  for (const entry of readdirSync(release, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const dir = resolve(release, entry.name);
+    // linux:  release/linux-unpacked/resources/app.asar
+    const linux = resolve(dir, "resources/app.asar");
+    if (existsSync(linux)) return linux;
+    // macOS:  release/mac-arm64/<productName>.app/Contents/Resources/app.asar
+    for (const child of readdirSync(dir)) {
+      if (!child.endsWith(".app")) continue;
+      const mac = resolve(dir, child, "Contents/Resources/app.asar");
+      if (existsSync(mac)) return mac;
+    }
+  }
+  return null;
+}
+
+/**
  * Fail if app.asar has grown well past the renderer it is supposed to contain.
  *
  * `files` in electron-builder.yml excludes the renderer's dependency tree by
@@ -164,11 +196,13 @@ process.exit(assertAsarBudget());
  */
 function assertAsarBudget() {
   const BUDGET_MB = 140; // dist/ is ~108 MB; electron-updater's tree is ~1 MB
-  const asar = [
-    resolve(APP_ROOT, "release/mac-arm64/cc-miner.app/Contents/Resources/app.asar"),
-    resolve(APP_ROOT, "release/linux-unpacked/resources/app.asar"),
-  ].find((p) => existsSync(p));
-  if (!asar) return 0; // nothing built here to measure (a dmg-only rebuild, say)
+  const asar = findAsar();
+  if (!asar) {
+    // Nothing built here to measure — a dmg-only rebuild, say. Said out loud,
+    // because "the budget check quietly did nothing" is how it broke before.
+    console.log("\n  app.asar not found under release/ — size budget not checked");
+    return 0;
+  }
 
   const mb = statSync(asar).size / 1e6;
   console.log(`\n  app.asar ${mb.toFixed(1)} MB (budget ${BUDGET_MB} MB)`);

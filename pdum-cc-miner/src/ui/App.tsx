@@ -57,7 +57,7 @@ function NoData(props: { error: string }) {
         This app reads Parquet generated from your own Claude Code transcripts. The files are
         gitignored on purpose — they carry project names, branch names and paths.
       </p>
-      <pre class="cco-cmd">pnpm -C apps/cc-miner normalize</pre>
+      <pre class="cco-cmd">pnpm -C pdum-cc-miner normalize</pre>
       <p class="cco-note">…then reload. The loader reported:</p>
       <pre class="cco-err">{props.error}</pre>
     </div>

@@ -7,7 +7,8 @@
  * kept for exactly one job — speaking Quack's binary wire format so we do not
  * have to implement it.
  *
- * The measurement that forced this shape (docs/guide/duckdb-mosaic.md):
+ * The measurement that forced this shape (upstream: pdum_aiui's
+ * docs/guide/duckdb-mosaic.md):
  * `ATTACH`-ing the remote catalog performs **no pushdown at all** — a bare
  * `count(*)` over a 272 MB table moved 5.26 GB in 1853 round trips — whereas
  * `quack_query`, which ships the SQL as a string, answered it in 5 ms with ~0

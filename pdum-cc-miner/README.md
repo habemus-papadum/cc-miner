@@ -2,9 +2,11 @@
 
 Your own Claude Code usage: cost per turn, where it goes, and whether a session was time well spent.
 
-Wired to the workspace (`workspace:^`, no npm install of aiui packages, no build step), and staged
-for eviction to its own repo — see [`scripts/evict.mjs`](../../scripts/evict.mjs). Its data comes
-from [`cc-assay`](../cc-assay) next door.
+The eviction from `pdum_aiui` has happened: the `@habemus-papadum/*` packages now arrive from
+**npm** at `^0.12.0` rather than through `workspace:^`, so a one-line fix upstream is a publish
+away. `pnpm link:up` points them back at a sibling checkout's source when that matters — see the
+[root README](../README.md#developing-against-the-aiui-packages-source). Its data comes from
+[`cc-assay`](../cc-assay) next door, which is still a workspace sibling.
 
 ## Two hosts, one app
 
@@ -41,7 +43,7 @@ host mode (30,420 turns, 104 sessions).
 ## Packaging
 
 ```sh
-pnpm pack:dir      # release/mac-arm64/cc-miner.app — fastest, for checking a change
+pnpm pack:dir      # release/mac-arm64/pdum-cc-miner.app — fastest, for checking a change
 pnpm pack:mac      # + .dmg, .zip and latest-mac.yml
 pnpm pack:linux    # + .AppImage, .deb and latest-linux.yml (must run ON Linux)
 ```
@@ -52,11 +54,12 @@ via `extraMetadata`:
 
 - **`main`** is `./src/index.ts`, the library barrel every sibling imports source-first. The
   bundle needs `electron/main.mjs`.
-- **`version`** is `X.Y.Z+dev`, the lockstep marker owned by the release pipeline
-  ([AGENTS.md](../../AGENTS.md)). It is also a semver trap: comparison **ignores build metadata**,
-  so `0.12.0+dev` and `0.12.0` compare *equal* and an updater would never fire. Local builds get
-  `0.12.0-dev.<sha>` — a prerelease, which sorts strictly *below* `0.12.0`, so a dev build can
-  never look newer than a real release.
+- **`version`** is the workspace lockstep marker, not the artifact's version. A release supplies
+  the real one through `PDUM_CC_MINER_VERSION`; a local build gets `0.12.0-dev.<sha>` — a
+  prerelease, which sorts strictly *below* `0.12.0`, so a dev build can never look newer than a
+  real release to an updater. The rewrite is unconditional because of a semver trap worth knowing:
+  comparison **ignores build metadata**, so a `X.Y.Z+dev` marker of the kind this repo inherited
+  compares *equal* to `X.Y.Z`, and an updater would never fire. Forever.
 
 ### The size budget
 
@@ -127,16 +130,15 @@ the answer, and `build/entitlements.mac.plist` justifies each of the four holes 
 
 ### Releases and auto-update
 
-`.github/workflows/cc-miner-release.yml` (manual dispatch, `version` + `dry_run`) builds macOS on
-an arm64 runner and Linux on ubuntu, and publishes to GitHub Releases.
+[`release.yml`](../.github/workflows/release.yml) (manual dispatch, `version` + `dry_run`)
+builds macOS on an arm64 runner and Linux on ubuntu, and publishes to this repo's GitHub Releases.
 
-**Releases go to a dedicated repo, not this one, and that is forced rather than chosen.**
-[`release.yml`](../../.github/workflows/release.yml) already owns the GitHub Releases list here —
-`vX.Y.Z`, carrying the `.vsix` and the Chrome extension zip. electron-updater asks GitHub for the
-*latest release* and then reads `latest-mac.yml` out of it, so the first npm release published
-after a cc-miner one would 404 every installed app's update check. Two feeds cannot share one
-release list. cc-miner is staged for eviction to its own repo anyway, so its releases start
-there.
+**Needing a release list of its own is what forced this repo to exist.** electron-updater asks
+GitHub for the *latest release* and then reads `latest-mac.yml` out of it — so while cc-miner lived
+in `pdum_aiui`, whose Releases list belongs to the npm packages at `vX.Y.Z`, the first package
+release published after a cc-miner one would have 404'd every installed app's update check. Two
+feeds cannot share one release list. Now that the feed is here, the automatic `GITHUB_TOKEN` is
+enough and there is no PAT to manage.
 
 `releaseType: release` is set explicitly because electron-builder's default is **draft**, and
 drafts are invisible to the updater — a release that looks published and updates nobody.
@@ -224,7 +226,8 @@ app report that you have no usage.
 Why not `ATTACH` the remote catalog and query it like a local table? Because
 `ATTACH` does no pushdown at all — a bare `count(*)` over a 272 MB table moved
 5.26 GB — while sending the SQL with `quack_query` answered it in 5 ms with ~0
-bytes. See [the DuckDB guide](../../docs/guide/duckdb-mosaic).
+bytes. The full measurement is written up upstream, in `pdum_aiui`'s
+[`docs/guide/duckdb-mosaic`](https://habemus-papadum.github.io/pdum_aiui/guide/duckdb-mosaic).
 
 The two can run at the same time; the Electron one suffixes its title with `· electron` so the
 windows are tellable apart. `pnpm dev:electron` opens a Chrome DevTools Protocol port on **9333**
@@ -253,8 +256,11 @@ earned it.
 ## Open it in the shared browser
 
 ```sh
-./aiui open http://localhost:5173   # from the repo root
+pnpm open http://localhost:5173     # from this directory
 ```
 
-Activate the intent client (**⌘B**) and describe what you want. See
-[docs/guide/getting-started.md](../../docs/guide/getting-started.md).
+(The `./aiui` launcher this used to name lives in `pdum_aiui`; here the CLI arrives as a
+dependency, so the package script is the way in.)
+
+Activate the intent client (**⌘B**) and describe what you want. See the upstream
+[getting-started guide](https://habemus-papadum.github.io/pdum_aiui/guide/getting-started).

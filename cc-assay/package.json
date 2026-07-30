@@ -6,8 +6,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/habemus-papadum/pdum_aiui.git",
-    "directory": "apps/cc-assay"
+    "url": "git+https://github.com/habemus-papadum/cc-miner.git",
+    "directory": "cc-assay"
   },
   "sideEffects": false,
   "exports": {

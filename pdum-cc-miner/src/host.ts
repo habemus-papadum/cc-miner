@@ -15,7 +15,8 @@
  *
  * Use this for cosmetics and for host-specific affordances that have a browser
  * fallback. It is NOT a data-access switch: where the bytes come from is the
- * coordinator's business (see docs/proposals/deployment-shapes.md), and a
+ * coordinator's business (upstream: pdum_aiui's
+ * docs/proposals/deployment-shapes.md), and a
  * renderer that branches on its shell to decide how to fetch is exactly the
  * second-path-to-one-truth this app keeps getting bitten by.
  */

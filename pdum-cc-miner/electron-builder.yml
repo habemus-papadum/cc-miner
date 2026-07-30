@@ -102,15 +102,15 @@ linux:
       arch: [x64]
 
 # ── The update feed ──────────────────────────────────────────────────────────
-# A DEDICATED repo, not the monorepo this lives in, and that is forced rather
-# than chosen: .github/workflows/release.yml already publishes GitHub Releases
-# here at `vX.Y.Z` carrying the .vsix and the Chrome extension. electron-updater
-# asks GitHub for the *latest release* and then reads `latest-mac.yml` out of
-# it — so the first npm release published after a cc-miner one would make every
+# THIS repo — habemus-papadum/cc-miner — and needing a release list of its own
+# is what forced the repo to exist. electron-updater asks GitHub for the *latest
+# release* and then reads `latest-mac.yml` out of it, so while cc-miner lived in
+# pdum_aiui, whose Releases list belongs to the npm packages at `vX.Y.Z`, the
+# first package release published after a cc-miner one would have made every
 # installed app's update check 404. Two feeds cannot share one release list.
 #
-# cc-miner is staged for eviction to its own repo anyway (CLAUDE.md → "The apps/
-# directory"), so its releases belong there from the start.
+# Now that the feed is here, the workflow's automatic GITHUB_TOKEN is enough and
+# there is no PAT to manage.
 #
 # `releaseType: release` because electron-builder's default is DRAFT, and drafts
 # are invisible to the updater — a release that looks published and updates

@@ -4,7 +4,8 @@
  * ## Why this is a module and not three lines inline
  *
  * The values that come back depend on *who decoded them*, and that changes when
- * the execution seam moves (see docs/proposals/deployment-shapes.md §2.1):
+ * the execution seam moves (upstream: pdum_aiui's
+ * docs/proposals/deployment-shapes.md §2.1):
  *
  * | column type | duckdb-wasm (apache-arrow) | Mosaic (flechette) |
  * | --- | --- | --- |

@@ -1,15 +1,20 @@
 /**
  * page.tsx — this app as a mountable **SitePage**: the one entry both hosts
- * share. `main.tsx` mounts it standalone; a multi-app shell (a gallery of
- * demos, a notebook site) can mount it too, discovering it through the
- * `aiui.sitePage` marker in package.json and this package's `./page` export.
+ * share. `main.tsx` mounts it standalone, in a browser tab and in the Electron
+ * window alike; a multi-app shell (a gallery, a notebook site) could mount it
+ * through this package's `./page` export instead.
+ *
+ * Such a shell discovers pages by convention, through an `aiui.sitePage` block
+ * in package.json — which this package does NOT declare, because nothing in
+ * this repo is a shell. It is one JSON block away if that changes; the contract
+ * is documented on the SitePage type in @habemus-papadum/aiui-viz.
  *
  * Importing this module IS the app's wiring: the graph import builds the cell
- * graph and registers the agent tools (side effects, on first import), and
- * the stylesheet rides along so the page carries its own look into any host.
- * Fill in `activate`/`deactivate` if the app ever runs continuous work (rAF
- * loops) that a shell should park while the page is off-route — the
- * pause-not-destroy lifecycle described on the SitePage type.
+ * graph and registers the agent tools (side effects, on first import), and the
+ * stylesheet rides along so the page carries its own look into any host.
+ * `activate`/`deactivate` are deliberately absent — cc-miner runs no continuous
+ * work for a shell to park, and its DuckDB connection costs nothing off-route.
+ * Add them if that ever stops being true (pause-not-destroy, per SitePage).
  */
 import "./styles.css";
 import "./model/graph"; // builds the cell graph + registers the agent tools

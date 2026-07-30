@@ -2,9 +2,12 @@
 /**
  * `cc-assay` — scan Claude Code transcripts, write the five Parquet tables.
  *
- *   pnpm -C apps/cc-assay normalize                    # → ./out
- *   pnpm -C apps/cc-assay normalize -- --out ../cc-miner/src/data
- *   pnpm -C apps/cc-assay normalize -- --offline --no-images
+ *   pnpm -C cc-assay normalize                    # → ./out
+ *   pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data
+ *   pnpm -C cc-assay normalize -- --offline --no-images
+ *
+ * `--out` is resolved against the CWD, which `pnpm -C` sets to this package —
+ * so the path above is relative to `cc-assay/`, not to the repo root.
  *
  * Prints the measurements that justify the pipeline (how wrong a naive reader
  * would be) and runs `checkInvariants` every time — a silent regression in the

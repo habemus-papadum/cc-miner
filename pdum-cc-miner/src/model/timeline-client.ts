@@ -128,8 +128,8 @@ export class SessionTimelineClient extends MosaicClient {
    * around it. Claiming stability would let the pre-aggregation index serve a
    * fixed set of groups and the timeline would stop losing and gaining tracks.
    * (seismos hit the milder version of this: its histogram kept a fixed
-   * magnitude domain and the index silently dropped point clauses. See
-   * demos/seismos/src/NOTES.md, finding 1.)
+   * magnitude domain and the index silently dropped point clauses. Written up
+   * upstream, in pdum_aiui's demos/seismos/src/NOTES.md, finding 1.)
    */
   get filterStable(): boolean {
     return false;

@@ -231,7 +231,7 @@ export function SessionReplay() {
                     This dataset was built without the replay grain. Regenerate with{" "}
                     <code>--replay</code> to read sessions back block by block:
                     <pre class="cco-cmd">
-                      pnpm -C apps/cc-assay normalize -- --out ../cc-miner/src/data --replay
+                      pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data --replay
                     </pre>
                   </p>
                 }

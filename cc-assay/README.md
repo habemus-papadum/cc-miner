@@ -1,14 +1,18 @@
 # `@habemus-papadum/cc-assay`
 
 Reader, normalizer and Parquet writer for **Claude Code session transcripts**.
-Internal, never published — the pure-model half of `apps/cc-miner`, in the same
-relation `demos/optics` has to the wave-optics notebooks.
+Internal, never published — the pure-model half of [`pdum-cc-miner`](../pdum-cc-miner)
+next door, which reads the Parquet this writes and knows nothing about transcripts.
 
 ```sh
-pnpm -C apps/cc-assay normalize                              # → ./out
-pnpm -C apps/cc-assay normalize -- --out ../cc-miner/src/data  # feed the demo
-pnpm -C apps/cc-assay normalize -- --offline --no-images
+pnpm -C cc-assay normalize                                    # → ./out
+pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data # feed the app
+pnpm -C cc-assay normalize -- --offline --no-images
 ```
+
+`--out` is resolved against this package's directory, not the repo root — `pnpm -C`
+sets the CWD. From the app side, `pnpm -C pdum-cc-miner normalize` wraps the second
+line above.
 
 ## What it does
 
@@ -34,7 +38,8 @@ and the invariant results.
 lenient accessors plus a `TRAPS` registry. Reading is total and never throws
 (Claude Code shipped 28 builds in the five weeks of the baseline corpus — a
 validating parser would have broken repeatedly); *noticing* drift is a separate
-offline job, `exploration/cc-usage/{census,diff}.mjs`.
+offline job, and it did not come along with the eviction — the census/diff scripts
+it used live in `pdum_aiui` under `exploration/cc-usage/`.
 
 The traps that decide the design, each pinned by a test in `normalize.test.ts`:
 
@@ -92,4 +97,5 @@ it models cache writes as one bucket, and Anthropic's 1-hour cache tier costs
 1.6× the 5-minute one — 54.8% of cache-creation tokens here, so flat-rating
 understates total spend by 6.9%. See `src/pricing.ts` and the proposal, §3.
 
-Full design: [`docs/proposals/claude-code-usage-analytics.md`](../../docs/proposals/claude-code-usage-analytics.md).
+Full design: the `claude-code-usage-analytics` proposal, which stayed behind in
+`pdum_aiui` under `docs/proposals/`.

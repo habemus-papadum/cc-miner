@@ -2,12 +2,14 @@
  * Everything we know about Claude Code's transcript schema, encoded as accessor
  * functions rather than as a validating type system.
  *
- * The design bet (docs/proposals/claude-code-usage-analytics.md §5.1): Claude
+ * The design bet (§5.1 of the claude-code-usage-analytics proposal, which stayed
+ * behind in pdum_aiui's docs/proposals/): Claude
  * Code ships a new build every few days and adds fields freely — 28 builds in
  * the five weeks of the baseline corpus. A validating parser turns every such
  * addition into a crash or a silent record drop. What we need instead is a
- * **lenient reader plus a loud census**: read defensively here, and let
- * `exploration/cc-usage/{census,diff}.mjs` be the thing that notices drift.
+ * **lenient reader plus a loud census**: read defensively here, and let a
+ * separate offline job be the thing that notices drift — the census/diff
+ * scripts live upstream, under exploration/cc-usage/.
  *
  * Every accessor below obeys three rules:
  *   1. Never throw on a malformed record — return a null-ish value.
