@@ -1,6 +1,7 @@
 # Deployment: where this stands, and what is next
 
-Written 2026-07-29 as a handoff. The next session should start here.
+Written 2026-07-29 as a handoff; §1 and §2 updated 2026-07-30 when signing and notarization
+landed. The next session should start here.
 
 Everything below marked **measured** was verified by running it, and the numbers are real. Do not
 re-derive those — the interesting ones cost hours to find. Everything marked **unverified** has
@@ -20,28 +21,56 @@ never been executed; treat it as a plan, not a fact.
 **Measured, end to end:** the packaged macOS app boots and answers in both data modes — local
 (duckdb-wasm in the renderer) and host (a native DuckDB sidecar the app spawns itself). Identical
 numbers in a browser tab, an Electron dev window, and a `.dmg`-installed bundle. The `.dmg`/`.zip`
-build, `latest-mac.yml`, and `electron-updater` detection all work.
+build, `latest-mac.yml`, and `electron-updater` detection all work. Signing and notarization are
+done — see §2.
 
-Sizes: `.app` 495 MB installed (Electron 273, `dist/` 108, `libduckdb.dylib` 112), `.dmg` 192 MB.
+Sizes, **with a corpus**: `.app` 495 MB installed (Electron 273, `dist/` 108, `libduckdb.dylib`
+112), `.dmg` 192 MB. This repo ships none, so a build here is smaller and the difference is the
+data, not a regression: `app.asar` 89.6 MB against its 140 MB budget, `.dmg` 167 MB.
 
-## 2. The only thing standing between this and a shippable macOS build
+## 2. Signing and notarization — **done, measured 2026-07-30**
 
-**A `Developer ID Application` certificate.** This machine has only `Apple Development`
-(team `WBSD7374P8`), which `electron/pack.mjs` deliberately **refuses** to sign with — that
-certificate produces something that looks signed, passes `codesign --verify`, runs where it was
-built, and is rejected by `notarytool` and by Gatekeeper on every other Mac. Unsigned and honest
-beats signed and untrue.
+A locally built `.dmg` and `.zip` are now signed, notarized, and stapled, and Gatekeeper accepts
+both. This section used to say a `Developer ID Application` certificate was the only thing missing;
+it exists now, on team **`QR7G4C9JWN`** (not `WBSD7374P8`, which is the `Apple Development` team and
+is still the one `pack.mjs` refuses to sign with).
 
-### 2.1 What to create (needs the Apple account; ~15 minutes)
+What was verified, on the artifacts themselves rather than from build logs:
 
-1. **The certificate.** Xcode → *Settings → Accounts → Manage Certificates → + → Developer ID
-   Application*. Requires the Account Holder or Admin role on the team; a free personal team can
-   only issue `Apple Development`. Verify with:
+| | |
+| --- | --- |
+| `codesign --verify --deep --strict` | valid, satisfies its Designated Requirement |
+| chain | Developer ID Application → Developer ID CA → Apple Root CA |
+| hardened runtime | `flags=0x10000(runtime)`, all five entitlements embedded |
+| `libduckdb.dylib`, `duckdb.node` | re-signed under our Team ID — previously only inferred |
+| `.dmg` and `.zip` | `accepted / source=Notarized Developer ID` |
+| app **mounted from the dmg**, app **extracted from the zip** | both accepted |
+
+Two things that only appeared by checking the result, both now handled in the repo:
+
+- **The dmg is notarized separately, by `pack.mjs`, after electron-builder finishes.** electron-
+  builder staples the `.app` and *then* wraps it, so the zip is correct as built and the dmg gets
+  no ticket of its own. `stapleDmgs()` submits, staples, and re-validates.
+- **`dmg.sign: true` is required.** With a ticket but no signature, Apple's documented check for a
+  downloaded disk image — `spctl -a -t open --context context:primary-signature` — answers
+  `rejected: no usable signature`, even though the app inside is accepted.
+
+And one consequence worth not rediscovering: **stapling appends ~2 KB to the dmg**, which
+invalidates any checksum recorded before it. Hence `dmg.writeUpdateInfo: false` — the dmg is
+deliberately absent from `latest-mac.yml`. Nothing is lost, because electron-updater downloads what
+`path:` names, which is the zip.
+
+### 2.1 Reproducing it (needs the Apple account)
+
+1. **The certificate** — Xcode → *Settings → Accounts → Manage Certificates → + → Developer ID
+   Application*. Requires Account Holder or Admin; a free personal team can only issue
+   `Apple Development`. Verify with:
    ```sh
    security find-identity -v -p codesigning | grep "Developer ID Application"
    ```
-   With it present, `pnpm -C pdum-cc-miner pack:mac` signs automatically — `gatherSigning()` looks
-   for that exact string.
+   Note that a machine with no distribution certificate also reports two `Developer ID` hits —
+   those are Apple's *intermediate CAs*, which ship on every Mac. Grep for the full
+   `Developer ID Application:` prefix, not `Developer ID`.
 
 2. **An App Store Connect API key**, for notarization. appstoreconnect.apple.com → *Users and
    Access → Integrations → App Store Connect API → +*. Role **Developer** is enough. Download the
@@ -49,14 +78,25 @@ beats signed and untrue.
 
    Prefer the API key over an app-specific password: no 2FA prompt, so it works unattended in CI.
 
-3. **Locally**, to notarize from your machine:
+3. **Locally.** Keep the key outside the repo — `~/.config/cc-miner/`, mode 600 — and source the
+   three variables rather than exporting them into your shell profile:
    ```sh
-   export APPLE_API_KEY=~/private_keys/AuthKey_XXXXXXXX.p8
-   export APPLE_API_KEY_ID=XXXXXXXX
-   export APPLE_API_ISSUER=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   set -a; . ~/.config/cc-miner/signing.env; set +a
    pnpm -C pdum-cc-miner pack:mac
    ```
+   `signing.env` holds only a path and two identifiers; the `.p8` is the sole secret.
+
+   Validate credentials *before* a build — it costs seconds, where a bad trio otherwise fails at
+   the very end of one:
+   ```sh
+   xcrun notarytool history --key <p8> --key-id <id> --issuer <issuer>
+   ```
+
    `pack.mjs` prints which mode it chose before building — read that line rather than assuming.
+
+   **Unset any stray `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` first.** electron-builder checks
+   those *before* the API key and throws if either is set without the other, so a leftover in a
+   shell profile hijacks notarization and hard-fails.
 
 4. **In CI**, as repo secrets (Settings → Secrets and variables → Actions):
 
@@ -98,12 +138,20 @@ dies. Signed, hardened, and broken in exactly the half a smoke test would not co
 
 ### 2.3 Unverified, and expected to bite first
 
-- **Notarization has never run.** Stapling, the `zip`-vs-`dmg` ordering, and whether the sidecar's
-  `utilityProcess` survives a notarized bundle are all untested.
-- **Auto-update cannot work unsigned.** Squirrel.Mac verifies the replacement's signature against
-  the running app's, so an unsigned build downloads and fails to install. Detection *is* measured
-  (a 0.1.0 build against a feed advertising 0.9.9 finds it and waits for consent, via
-  `PDUM_CC_MINER_UPDATE_URL`); the install half becomes testable only once signing works.
+- **A real release has never been published, and `pack.mjs` now refuses to.** With
+  `PDUM_CC_MINER_PUBLISH=always` on a notarizing mac build it exits 2, because the dmg cannot be
+  stapled before it is uploaded — measured in app-builder-lib 26.15.3, `PublishManager` schedules
+  each upload from the `artifactCreated` event and `AsyncTaskManager.addTask` receives an
+  *already-started* promise, so the bytes are in flight before any hook runs. **Fixing this is the
+  next deployment task**: split the release into build → staple → publish. Until then
+  `release.yml` works for `dry_run=true` only.
+- **Whether the sidecar's `utilityProcess` survives a notarized bundle is still untested.** The
+  bundle is notarized now, so this is finally checkable — and it is the half that a launch-only
+  smoke test cannot see (§2.2). Install the `.dmg`, then switch to host mode.
+- **Auto-update's install half.** Squirrel.Mac verifies the replacement's signature against the
+  running app's, which is now satisfiable for the first time. Detection *is* measured (a 0.1.0
+  build against a feed advertising 0.9.9 finds it and waits for consent, via
+  `PDUM_CC_MINER_UPDATE_URL`); the install half needs two signed builds and a feed between them.
 - **Linux has never been built.** AppImage + deb are configured and the DuckDB linux bindings exist
   on npm and in the lockfile, but no artifact has been produced. Needs a Linux runner.
 - **x64 macOS** is not configured — arm64 only. The `@duckdb/node-bindings-darwin-x64` package

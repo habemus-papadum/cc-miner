@@ -98,6 +98,32 @@ To sign and notarize for real, two things are needed and neither can be derived 
 
 With neither, `pnpm pack:mac` still produces working artifacts and says plainly what they are.
 
+Note the asymmetry in what gets passed where: `gatherSigning()` **searches** for the full
+`Developer ID Application: Name (TEAM)` common name, because that prefix is what proves the
+certificate is a distribution one — but hands electron-builder only the `Name (TEAM)` half, since
+it applies the type itself and rejects a prefixed qualifier outright.
+
+#### The dmg needs a second pass — measured
+
+electron-builder notarizes the `.app`, staples the ticket to it, and *then* wraps it. So the zip
+ships an already-stapled app and is correct as built, while the **dmg gets no ticket of its own**.
+An unstapled dmg passes Gatekeeper only by asking Apple at open time, so it fails offline in a way
+indistinguishable from an unsigned build. `stapleDmgs()` in `pack.mjs` therefore submits each dmg
+to `notarytool`, staples it, and re-validates.
+
+Two consequences that are easy to get wrong:
+
+- **`dmg.sign: true`.** With a ticket but no signature, Apple's own check for a downloaded disk
+  image (`spctl -a -t open --context context:primary-signature`) answers `rejected: no usable
+  signature` even though the app inside is accepted.
+- **`dmg.writeUpdateInfo: false`.** Stapling appends ~2 KB *after* electron-builder has recorded a
+  sha512 and size, so the dmg must not appear in `latest-mac.yml` — an entry there would assert a
+  checksum the file no longer has. The updater reads the zip, which nothing touches after signing.
+
+**`pack:mac` refuses to run with `PDUM_CC_MINER_PUBLISH=always`** while notarizing, because uploads
+begin as each artifact is created — before the dmg can be stapled. Publishing needs splitting into
+build → staple → publish; until then, a real macOS release cannot be cut from CI.
+
 #### The entitlement that is actually required — measured, not predicted
 
 Hardened runtime is mandatory for notarization, and it enables **library validation**: every
