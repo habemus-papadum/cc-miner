@@ -47,6 +47,48 @@
 .cco-head {
   margin-bottom: 28px;
 }
+.cco-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cco-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.cco-source-btn {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--cco-line, #2a2f37);
+  background: transparent;
+  color: var(--cco-dim, #8b94a3);
+  cursor: pointer;
+}
+.cco-source-btn:hover {
+  color: var(--cco-fg, #e6e9ef);
+}
+.cco-source-btn.is-on {
+  border-color: var(--cco-accent, #6ea8fe);
+  color: var(--cco-accent, #6ea8fe);
+  cursor: default;
+}
+.cco-source-label {
+  font-size: 11px;
+  color: var(--cco-dim, #8b94a3);
+  /* The corpus path can be long (an S3 prefix); never let provenance push the
+     header wider than the page. */
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cco-h1 {
   font-size: 26px;
   font-weight: 600;

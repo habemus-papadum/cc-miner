@@ -207,8 +207,21 @@ export const sourceMode = appScope.durableSignal<SourceMode>(
   resolveMode(typeof location === "undefined" ? "" : location.search, browserModeStore()),
 );
 
-/** Provenance for the UI: which mode, and what the host is reading. */
+/**
+ * Provenance for the UI: which mode, and what the host is reading.
+ *
+ * Reads `ready` first, and that line is the whole point. `sourceBox` is a
+ * plain `durable()`, not a signal, so a component calling this would render
+ * once — before the source resolves — and keep the bare mode name forever,
+ * never showing the directory or S3 prefix actually being served. Measured:
+ * the header showed `host` where it should have read
+ * `host · /Users/nehal/.cache/cc-miner`. Depending on `ready` gives Solid
+ * something to re-run on, and the label is exactly the thing you consult to
+ * tell a stale corpus from the real one — so it silently not updating is worse
+ * than it being absent.
+ */
 export function sourceLabel(): string {
+  ready.get();
   return sourceBox.source?.label ?? sourceMode.get();
 }
 

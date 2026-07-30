@@ -46,9 +46,10 @@ which is what makes comparing them meaningful:
 | **local** (default) | duckdb-wasm in the page, over shards fetched from `/__corpus` | no |
 | **host** | a native DuckDB answering over [Quack](https://duckdb.org/docs/current/quack/overview) | yes — `pnpm serve`, or the packaged app's own sidecar |
 
-Pick with `?source=local` / `?source=host`; the choice is remembered. **There is no fallback in
-either direction.** Asking for `host` with no host running is an error, never a quiet downgrade —
-a stale local corpus standing in for the real one is invisible in the UI and expensive in trust.
+Pick with the switcher in the app header, or `?source=local` / `?source=host`; the choice is
+remembered and switching reloads. **There is no fallback in either direction.** Asking for `host`
+with no host running is an error, never a quiet downgrade — a stale local corpus standing in for
+the real one is invisible in the UI and expensive in trust.
 
 ## Packaging
 

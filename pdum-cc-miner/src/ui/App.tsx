@@ -26,6 +26,7 @@ import { SessionDetail } from "./SessionDetail";
 import { SessionReplay } from "./SessionReplay";
 import { Sessions } from "./Sessions";
 import { SessionTimeline } from "./SessionTimeline";
+import { SourceSwitch } from "./SourceSwitch";
 import { Summary } from "./Summary";
 import { TurnScatter } from "./TurnScatter";
 
@@ -68,8 +69,14 @@ export function App() {
   return (
     <div class="app cco">
       <header class="cco-head">
-        <h1 class="cco-h1">cc-miner</h1>
-        <p class="cco-sub">your own Claude Code usage, and whether it was time well spent</p>
+        <div class="cco-head-row">
+          <div>
+            <h1 class="cco-h1">cc-miner</h1>
+            <p class="cco-sub">your own Claude Code usage, and whether it was time well spent</p>
+          </div>
+          {/* Outside the CellView below on purpose — see SourceSwitch. */}
+          <SourceSwitch />
+        </div>
       </header>
       {/* The dataset cell drives the load; the page is its view. */}
       <CellView

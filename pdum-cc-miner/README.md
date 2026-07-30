@@ -210,8 +210,12 @@ what makes comparing their answers meaningful:
 | **local** (default) | duckdb-wasm in the tab, over shards fetched from `/__corpus` | no |
 | **host** | a native DuckDB answering over Quack | yes — `pnpm serve`, or the packaged app's own sidecar |
 
-Pick with `?source=local` / `?source=host`; the choice is remembered. **There is
-no fallback in either direction**: asking for `host` with no host running is an
+Pick with the switcher in the app header, or `?source=local` / `?source=host`;
+the choice is remembered and switching reloads the page — the connector is chosen
+at boot. The control lives in the header, OUTSIDE the data region, so it survives
+the error state: asking for `host` with no host running is terminal, and a
+switcher inside the failed region would strand you there. **There is no fallback
+in either direction**: asking for `host` with no host running is an
 error, never a quiet downgrade to local bytes. A stale local corpus standing in
 for the real one is invisible in the UI and expensive in trust.
 

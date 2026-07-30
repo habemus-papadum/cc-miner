@@ -23,7 +23,17 @@ import {
 import { projectScale } from "./palette";
 import type { ReplayRow } from "./replay";
 import type { DetailCompaction, DetailTurn } from "./session-detail";
-import { appScope, brushTime, focusSession, idleGapMinutes, setAllCollapsed, store } from "./store";
+import { isSourceMode } from "./source-mode";
+import {
+  appScope,
+  brushTime,
+  focusSession,
+  idleGapMinutes,
+  setAllCollapsed,
+  setSourceMode,
+  sourceMode,
+  store,
+} from "./store";
 
 /** One row of the "where did the money go" breakdown. */
 export interface CostSlice {
@@ -593,6 +603,33 @@ export const inspectSession = action({
 });
 
 /** Fold every project in the session graph to one row, or unfold them all. */
+/**
+ * Switch which engine answers, the same verb the header button performs.
+ *
+ * Declared because declaring IS exposing: the mode is the single biggest
+ * question about where an answer came from, and an agent inspecting this app
+ * should be able to move it rather than only read it. Note this RELOADS the
+ * page — the connector is chosen at boot — so it is the one action here that
+ * ends the session it was called in.
+ */
+export const setSource = action({
+  scope: appScope,
+  name: "source",
+  description:
+    "Switch the data source between `local` (DuckDB-WASM in the page) and `host` " +
+    "(a native DuckDB answering over Quack). Reloads the page. Asking for `host` " +
+    "with no host running is a terminal error, never a quiet downgrade.",
+  params: { mode: "`local` or `host`." },
+  run: async (args?: Record<string, unknown>) => {
+    const mode = String(args?.mode ?? "");
+    if (!isSourceMode(mode)) throw new Error(`not a data source: ${mode || "(missing)"}`);
+    const from = sourceMode.get();
+    if (from === mode) return { mode, changed: false };
+    setSourceMode(mode);
+    return { mode, changed: true, reloading: true };
+  },
+});
+
 export const foldProjects = action({
   scope: appScope,
   name: "fold-projects",
