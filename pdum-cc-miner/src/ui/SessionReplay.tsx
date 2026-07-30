@@ -227,13 +227,20 @@ export function SessionReplay() {
               <Show
                 when={d().available}
                 fallback={
-                  <p class="cco-note">
-                    This dataset was built without the replay grain. Regenerate with{" "}
-                    <code>--replay</code> to read sessions back block by block:
+                  // `pre` is a SIBLING of the paragraph, never a child: `p` may
+                  // only contain phrasing content, so a browser closes the `p`
+                  // before the `pre` and leaves an empty one behind. The Solid
+                  // compiler warns about it, and the DOM it builds stops
+                  // matching this tree. Same shape as App.tsx's NoData panel.
+                  <>
+                    <p class="cco-note">
+                      This dataset was built without the replay grain. Regenerate with{" "}
+                      <code>--replay</code> to read sessions back block by block:
+                    </p>
                     <pre class="cco-cmd">
                       pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data --replay
                     </pre>
-                  </p>
+                  </>
                 }
               >
                 <Replay data={d()} />
