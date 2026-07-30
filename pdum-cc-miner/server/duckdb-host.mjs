@@ -250,13 +250,27 @@ async function main() {
   );
   const row = served.getRowObjects()[0];
 
-  // Prove the endpoint accepts a connection BEFORE advertising it. quack_serve
-  // returning a row says it started, not that anything can reach it — and the
-  // port handed to it was chosen by binding :0 and releasing, so the number can
-  // be claimed by someone else in the gap. Without this the failure lands in the
-  // renderer as an opaque `net::ERR_CONNECTION_REFUSED` from a worker, three
-  // processes away from the cause, while this log prints a healthy-looking
-  // `quack on …`. Fail here, where the reason is still in hand.
+  // A BARRIER, not a health check — do not "simplify" it away.
+  //
+  // The runtime file below is the only way the renderer learns the endpoint, so
+  // writing it is the act of advertising. `quack_serve` returning a row says it
+  // STARTED, not that its accept loop is running yet, and the old sequence
+  // advertised immediately: file written -> ensureHost() resolves ->
+  // /__duckdb-host answers -> the page fires its first query. A query landing
+  // inside that gap is refused on a port that is entirely correct.
+  //
+  // MEASURED in the field, and it explains what looked contradictory: the host
+  // logged `quack on http://127.0.0.1:51373`, the page was told 51373, and the
+  // renderer still reported `net::ERR_CONNECTION_REFUSED`. Nothing was
+  // mismatched; the listener was not accepting yet. It reproduced only on a
+  // machine busy enough to widen the window — first launch of a freshly
+  // installed bundle, with Gatekeeper verifying 500 MB — which is exactly why
+  // it never appeared in the smoke test or a hand probe, both of which happen
+  // to wait long enough.
+  //
+  // Gating the advertisement on a real connection closes it. The failure also
+  // now lands here, where the reason is still in hand, instead of in a worker
+  // three processes away.
   const listening = String(row.listen_url);
   await assertAccepting(listening);
 

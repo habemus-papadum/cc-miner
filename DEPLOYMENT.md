@@ -238,6 +238,29 @@ gh workflow run release.yml -f canary=true    # in pdum_aiui: X.Y.Z-canary.<sha>
   runtime dependency on the *first-query* path. Scoped as acceptable (an open connection is
   assumed), but it is why a CDN outage looks like a data bug.
 
+## 6. The race that produced `ERR_CONNECTION_REFUSED` — fixed in 0.1.3
+
+Worth recording because the evidence pointed away from the cause for a while.
+
+A real install showed host mode failing with `net::ERR_CONNECTION_REFUSED` while the host's own
+log read `quack on http://127.0.0.1:51373` and the page had been told **the same port**. Nothing
+was mismatched. `quack_serve` returns when it has *started*, not when its accept loop is running,
+and the sidecar advertised itself — wrote the runtime file — immediately after that return. The
+renderer's first query could land in the gap.
+
+`server/duckdb-host.mjs` now gates the advertisement on an actual TCP connect (`assertAccepting`).
+It is a **barrier, not a health check**; removing it reopens the race.
+
+Two things this cost, both instructive:
+
+- **It reproduced only on a busy machine** — first launch of a freshly installed 500 MB bundle,
+  with Gatekeeper verifying it. `pnpm smoke` and a hand probe both waited long enough by
+  accident, so neither ever saw it.
+- **The matching port numbers argued against the true cause.** They were evidence the port was
+  right, which is not the same as evidence the endpoint was reachable. A separate latent bug found
+  while chasing it — the page was told the port the host *requested* rather than the one quack
+  *bound* — was real, fixed, and not this.
+
 ## 6. Timings, measured 2026-07-30
 
 On this machine (M-series Mac, fast link), against a 500-file / 639 MB transcript corpus:
