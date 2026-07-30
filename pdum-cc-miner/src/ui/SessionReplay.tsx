@@ -238,7 +238,7 @@ export function SessionReplay() {
                       <code>--replay</code> to read sessions back block by block:
                     </p>
                     <pre class="cco-cmd">
-                      pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data --replay
+                      pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data --replay
                     </pre>
                   </>
                 }

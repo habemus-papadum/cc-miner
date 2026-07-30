@@ -5,14 +5,19 @@ Internal, never published — the pure-model half of [`pdum-cc-miner`](../pdum-c
 next door, which reads the Parquet this writes and knows nothing about transcripts.
 
 ```sh
-pnpm -C cc-assay normalize                                    # → ./out
-pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data # feed the app
-pnpm -C cc-assay normalize -- --offline --no-images
+pnpm -C cc-assay normalize                                 # → ./out
+pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data # feed the app
+pnpm -C cc-assay normalize --offline --no-images
 ```
 
-`--out` is resolved against this package's directory, not the repo root — `pnpm -C`
-sets the CWD. From the app side, `pnpm -C pdum-cc-miner normalize` wraps the second
-line above.
+Two things about that invocation, both learned the hard way:
+
+- **No `--` separator.** pnpm 11 forwards arguments to the script as-is and passes a
+  literal `--` straight through, which `parseArgs` then refuses as an unknown
+  argument. Every `normalize -- --out` in this repo was broken until 2026-07-30.
+- **`--out` resolves against this package's directory**, not the repo root, because
+  `pnpm -C` sets the CWD. From the app side, `pnpm -C pdum-cc-miner normalize`
+  wraps the second line above.
 
 ## What it does
 

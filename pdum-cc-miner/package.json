@@ -24,7 +24,7 @@
     "dev": "vite",
     "dev:electron": "node electron/dev.mjs",
     "icon": "node electron/make-icon.mjs",
-    "normalize": "pnpm -C ../cc-assay normalize -- --out ../pdum-cc-miner/src/data",
+    "normalize": "pnpm -C ../cc-assay normalize --out ../pdum-cc-miner/src/data",
     "open": "aiui open",
     "pack:dir": "node electron/pack.mjs dir",
     "pack:linux": "node electron/pack.mjs linux",

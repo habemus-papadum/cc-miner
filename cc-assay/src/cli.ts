@@ -3,8 +3,13 @@
  * `cc-assay` — scan Claude Code transcripts, write the five Parquet tables.
  *
  *   pnpm -C cc-assay normalize                    # → ./out
- *   pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data
- *   pnpm -C cc-assay normalize -- --offline --no-images
+ *   pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data
+ *   pnpm -C cc-assay normalize --offline --no-images
+ *
+ * Note there is **no `--` separator**. pnpm 11 forwards arguments as-is and hands
+ * a literal `--` to the script, which `parseArgs` then rejects as an unknown
+ * argument — correctly, per its own rule below. Every documented
+ * `normalize -- --out` in this repo was broken until 2026-07-30.
  *
  * `--out` is resolved against the CWD, which `pnpm -C` sets to this package —
  * so the path above is relative to `cc-assay/`, not to the repo root.

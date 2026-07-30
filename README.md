@@ -13,7 +13,7 @@ told at runtime which shell it is in. Two packages:
 
 ```sh
 pnpm install
-pnpm -C cc-assay normalize -- --out ../pdum-cc-miner/src/data   # make your own corpus
+pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data   # make your own corpus
 pnpm -C pdum-cc-miner dev                                       # browser, http://localhost:5173
 pnpm -C pdum-cc-miner dev:electron                              # …or an Electron window
 ```

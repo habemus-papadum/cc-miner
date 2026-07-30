@@ -15,7 +15,7 @@ names, branch names and paths. A fresh clone renders `NoData` in `ui/App.tsx`, w
 not broken. Make your own:
 
 ```sh
-pnpm -C ../cc-assay normalize -- --out ../pdum-cc-miner/src/data
+pnpm -C ../cc-assay normalize --out ../pdum-cc-miner/src/data
 ```
 
 So: **never add a fixture corpus to the repo to make something demoable**, and never treat an
