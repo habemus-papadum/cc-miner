@@ -28,6 +28,34 @@ import { APP_ORIGIN, distExists, registerAppScheme, serveApp } from "./app-schem
 import { bindSidecarLifetime } from "./duckdb-sidecar.mjs";
 import { initUpdater } from "./updater.mjs";
 
+/**
+ * A log write must never be able to kill the app. FIRST, before anything logs.
+ *
+ * When stdout or stderr is a pipe whose reader has gone — launched from a shell
+ * that then exited, piped into a command that closed early — the next write
+ * raises EPIPE. Node turns an unhandled `error` on these streams into an
+ * uncaught exception, and Electron presents that as the modal "A JavaScript
+ * error occurred in the main process". The app is gone.
+ *
+ * MEASURED, from a real install: accepting the update prompt did exactly this.
+ * `downloadUpdate()` logs progress continuously through `autoUpdater.logger`, so
+ * the first write into a dead pipe took the whole main process down —
+ *
+ *   Uncaught Exception: Error: write EPIPE
+ *     at Object.info (…/app.asar/electron/updater.mjs:42:26)
+ *
+ * — and with it the DuckDB `utilityProcess`, so the renderer's next query failed
+ * against a port that no longer had a listener. Two visible failures, one cause,
+ * and neither of them anything to do with what the user was actually doing.
+ *
+ * Swallowing is right here: in a packaged GUI app these streams exist only for
+ * diagnostics, and there is nothing useful to do about not being able to write
+ * one. Crashing is emphatically not it.
+ */
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", () => {});
+}
+
 const devUrl = process.env.PDUM_CC_MINER_URL ?? "";
 const isDev = devUrl !== "";
 

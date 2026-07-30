@@ -38,10 +38,22 @@ export function initUpdater() {
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  // Belt and braces with the stdout/stderr guard in main.mjs, and here because
+  // this is the logger that fires HARDEST: `downloadUpdate()` reports progress
+  // continuously, so a broken pipe surfaces on this path first. It did — an
+  // EPIPE from the `info` line below crashed the main process the moment the
+  // update prompt was accepted.
+  const say = (/** @type {"log"|"warn"|"error"} */ level, /** @type {unknown} */ m) => {
+    try {
+      console[level]("[updater]", m);
+    } catch {
+      // A diagnostic that cannot be written is not worth an app.
+    }
+  };
   autoUpdater.logger = {
-    info: (m) => console.log("[updater]", m),
-    warn: (m) => console.warn("[updater]", m),
-    error: (m) => console.error("[updater]", m),
+    info: (m) => say("log", m),
+    warn: (m) => say("warn", m),
+    error: (m) => say("error", m),
     debug: () => {},
   };
 
