@@ -75,11 +75,30 @@ mac:
   # under the app's own binary, but the renderer helpers still need JIT, and a
   # mismatch here fails at launch rather than at signing.
   entitlementsInherit: build/entitlements.mac.plist
+  # `identity` is deliberately ABSENT, and must stay absent. `electron/pack.mjs`
+  # owns the choice and states it explicitly in every case: `null` when there is
+  # no distribution certificate, the `Name (TEAM)` qualifier when one is found in
+  # the keychain, and nothing at all under CSC_LINK — where electron-builder
+  # imports the .p12 into a temporary keychain and must auto-discover from it.
+  #
+  # This key used to be `identity: null` as a "default", which is not a default:
+  # electron-builder reads null as "signing explicitly disabled". On the CSC_LINK
+  # path, where pack.mjs passes no override, that silently turned a fully
+  # credentialled CI release into an unsigned one —
+  #
+  #   • skipped macOS code signing  reason=identity explicitly is set to null
+  #
+  # — and the failure surfaced three steps later as Apple rejecting the dmg
+  # ("The signature of the binary is invalid", on every Helper). MEASURED in run
+  # 30558745784. A value that disables the feature is a poor stand-in for
+  # "unset".
+  #
   # `Developer ID Application`, never `Apple Development`. The latter is a
   # local-testing certificate: notarytool rejects it, and Gatekeeper on any
   # other machine rejects what it signs. Left to its own devices,
-  # electron-builder will happily pick up whichever it finds first.
-  identity: null # set by CI/env; see gatherSigning in electron/pack.mjs
+  # electron-builder will happily pick up whichever it finds first — which is
+  # why pack.mjs names the identity rather than leaving it to auto-discovery
+  # whenever it can see the keychain itself.
   # macOS 11+ everywhere the arm64 build can run anyway.
   minimumSystemVersion: "11.0"
   gatekeeperAssess: false

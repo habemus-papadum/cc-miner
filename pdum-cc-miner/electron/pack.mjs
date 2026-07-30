@@ -211,11 +211,27 @@ function stapleDmgs(notarytoolArgs) {
   for (const dmg of dmgs) {
     console.log(`\n  notarizing ${dmg.slice(RELEASE.length + 1)} …`);
     const sub = spawnSync("xcrun", ["notarytool", "submit", dmg, ...notarytoolArgs, "--wait"], {
-      stdio: "inherit",
+      encoding: "utf8",
     });
-    if (sub.status !== 0) {
-      console.error("\n  notarytool submit failed for the dmg. The .app and .zip are unaffected.");
-      return sub.status ?? 1;
+    process.stdout.write(sub.stdout ?? "");
+    process.stderr.write(sub.stderr ?? "");
+    const out = `${sub.stdout ?? ""}${sub.stderr ?? ""}`;
+
+    // MEASURED: `notarytool submit --wait` exits 0 even when Apple REJECTS the
+    // submission — `status: Invalid` and exit code 0 together. Trusting the exit
+    // code let a rejected dmg through to `stapler`, which then failed with
+    // "Could not find base64 encoded ticket in response" — an error about a
+    // missing ticket, three steps removed from the actual cause, which was an
+    // unsigned app inside the dmg. So the VERDICT is what gets checked.
+    if (sub.status !== 0 || !/status:\s*Accepted/i.test(out)) {
+      const id = out.match(/id:\s*([0-9a-f-]{8}-[0-9a-f-]{4,})/i)?.[1];
+      console.error(
+        `\n  notarization did not succeed for ${dmg.slice(RELEASE.length + 1)}.` +
+          `\n  Ask Apple why — the log names the offending binary and the reason:` +
+          (id ? `\n    xcrun notarytool log ${id} <same credentials>` : "") +
+          `\n  The .app and .zip are unaffected.`,
+      );
+      return sub.status === 0 ? 1 : (sub.status ?? 1);
     }
 
     const staple = spawnSync("xcrun", ["stapler", "staple", dmg], { stdio: "inherit" });
