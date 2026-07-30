@@ -56,6 +56,9 @@ function appVersion() {
   return `${base}-dev.${suffix}`;
 }
 
+/** The keychain common-name prefix that marks a distribution certificate. */
+const IDENTITY_PREFIX = "Developer ID Application: ";
+
 /**
  * Decide how (and whether) this build is signed and notarized, and say so.
  *
@@ -67,6 +70,17 @@ function appVersion() {
  * valid for distribution outside the App Store, so this looks for that exact
  * string and treats anything else as unsigned.
  *
+ * Note the asymmetry between what we SEARCH for and what we PASS. The keychain's
+ * common name is `Developer ID Application: Name (TEAMID)`, and that whole string
+ * is what proves the certificate is the right kind — but `-c.mac.identity` must
+ * receive only the `Name (TEAMID)` half. electron-builder applies the certificate
+ * type itself and rejects a qualifier carrying the prefix outright ("Please
+ * remove prefix … — appropriate certificate will be chosen automatically"),
+ * which is a hard failure AFTER the renderer has been built and Electron
+ * downloaded. Measured against app-builder-lib 26.15.3: `findIdentity` checks
+ * the qualifier against `appleCertificatePrefixes` and throws, then matches what
+ * survives with `line.includes(qualifier)` over `security find-identity` output.
+ *
  * @returns {{args: string[], summary: string}}
  */
 function gatherSigning() {
@@ -75,16 +89,25 @@ function gatherSigning() {
   // CI supplies the certificate as a base64 .p12 in CSC_LINK; electron-builder
   // imports it into a temporary keychain itself.
   const fromEnv = Boolean(process.env.CSC_LINK);
+  /** The full common name, for the human reading the build log. */
   let identity = fromEnv ? "from CSC_LINK" : null;
+  /** The `Name (TEAMID)` half, which is the only form electron-builder accepts. */
+  let qualifier = null;
   if (!fromEnv) {
     const found = spawnSync("security", ["find-identity", "-v", "-p", "codesigning"], {
       encoding: "utf8",
     });
     const line = (found.stdout ?? "")
       .split("\n")
-      .find((l) => l.includes("Developer ID Application"));
+      .find((l) => l.includes(IDENTITY_PREFIX.trimEnd()));
     identity = line?.match(/"([^"]+)"/)?.[1] ?? null;
+    qualifier = identity?.startsWith(IDENTITY_PREFIX)
+      ? identity.slice(IDENTITY_PREFIX.length)
+      : identity;
   }
+
+  /** `-c.mac.identity`, or nothing when CSC_LINK owns the choice. */
+  const identityArgs = fromEnv ? [] : [`-c.mac.identity=${qualifier}`];
 
   if (!identity) {
     return {
@@ -105,7 +128,7 @@ function gatherSigning() {
 
   if (!apiKey && !appleId) {
     return {
-      args: [...(fromEnv ? [] : [`-c.mac.identity=${identity}`]), "-c.mac.notarize=false"],
+      args: [...identityArgs, "-c.mac.notarize=false"],
       summary:
         `  signed as ${identity}, NOT notarized — no Apple credentials in the environment.\n` +
         "  Gatekeeper shows the “cannot be opened” dialog on a machine that has not\n" +
@@ -114,7 +137,7 @@ function gatherSigning() {
   }
 
   return {
-    args: [...(fromEnv ? [] : [`-c.mac.identity=${identity}`]), "-c.mac.notarize=true"],
+    args: [...identityArgs, "-c.mac.notarize=true"],
     summary: `  signed as ${identity}, notarizing via ${apiKey ? "App Store Connect API key" : "Apple ID"}.`,
   };
 }
