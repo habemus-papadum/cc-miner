@@ -1,4 +1,7 @@
-# Cleanup plan — what we are actually doing
+# Cleanup plan — DONE (2026-07-31)
+
+> All items below are applied and committed, except §13 which was dropped.
+> A `hostIsLive` fix was added mid-execution as §0 — see the note under Order.
 
 Decided 2026-07-31 from the four-way review in the previous session. Everything here is agreed and
 scoped. Anything *considered* and shelved is in [`BACKLOG.md`](./BACKLOG.md); anything considered and
@@ -36,10 +39,18 @@ deletions, then the splits. Deletions before splits deliberately: removing the `
 | 10 | Split `store.ts` | `src/model/` |
 | 11 | Split `normalize.ts` | `cc-assay/src/` |
 | 12 | Split `graph.ts` | `src/model/` |
-| 13 | Bundle cc-assay into the packaged app — **inclusion only** | build step |
+| ~~13~~ | ~~Bundle cc-assay into the packaged app~~ — **dropped**: cc-assay is likely to be folded into a single package, so this would be work against a shape that is about to change | — |
 
-§13 is groundwork rather than cleanup, and it must come **after §9** — there is no point bundling
-the `raw` layer on Tuesday and deleting it on Wednesday.
+**§0, added during execution.** `hostIsLive()` proved a *pid* existed, not that it was our sidecar
+or that anything was listening. A dead sidecar's runtime file survived, macOS recycled its pid onto
+a Helper process of the installed app, and every launch then trusted a port with nothing on it —
+the intermittent host-mode failure that had twice been misattributed to whatever else had changed.
+The socket is now the authority. Reproduced deliberately (a runtime file naming a dead port and a
+live pid) rather than waited for.
+
+**§13 was dropped**, not deferred: cc-assay is likely to be folded into a single package, and
+bundling it now would be work against a shape that is about to change. The three blockers it
+documented are real and recorded in `BACKLOG.md` under "Run the miner from the UI".
 
 ---
 
