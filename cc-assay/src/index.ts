@@ -12,7 +12,9 @@
  * behind the `./node` subpath.
  */
 export * from "./fields.ts";
+export * from "./grains.ts";
 export * from "./images.ts";
+export * from "./invariants.ts";
 export * from "./lineage.ts";
 export * from "./normalize.ts";
 export * from "./pricing.ts";
