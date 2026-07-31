@@ -3,7 +3,10 @@
 Real findings, verified, deliberately **not** being acted on now. Kept so the evidence does not have
 to be rediscovered — several of these cost a full review pass to establish.
 
-Agreed work is in [`PLAN.md`](./PLAN.md); things turned down outright are in
+Current agreed work is in [`PLAN.md`](./PLAN.md), designed in
+[`ARCHITECTURE.md`](./ARCHITECTURE.md); the completed cleanup pass is
+[`CLEANUP-PLAN.md`](./CLEANUP-PLAN.md), whose § numbers the notes below refer to. Things turned down
+outright are in
 [`DECLINED.md`](./DECLINED.md). file:line references are from `d406ddf`.
 
 ---
@@ -45,7 +48,7 @@ Removing all eleven was verified green in a scratch copy: `upstream:check`, `lin
 `pnpm exec tsc` / `vitest`.
 
 **Prerequisite when this happens:** declare `@types/node` in both subpackages first — that part is
-in `PLAN.md` §6, precisely because it is the trap that fires otherwise.
+in `CLEANUP-PLAN.md` §6, precisely because it is the trap that fires otherwise.
 
 ### `pdum-cc-miner` — keeping, will be used later
 
@@ -56,7 +59,7 @@ in `PLAN.md` §6, precisely because it is the trap that fires otherwise.
   applies.
 - **`typescript-language-server`** (`:61`) — no reference in any script or config; also at root.
 - **The `normalize` script** (`:27`) — kept. Its `--out` target (`src/data`) no longer exists and it
-  writes a layout the app cannot read, so it is currently a trap for anyone who runs it. `PLAN.md` §2
+  writes a layout the app cannot read, so it is currently a trap for anyone who runs it. `CLEANUP-PLAN.md` §2
   fixes the *documentation* that points people at it; the script itself stays.
 
 ### Do not remove these when the prune happens
@@ -107,7 +110,7 @@ also removing `export.test.ts:68-123` and the `bytes` field on `ShardEntry` (`ex
   (`export-cli.ts:29`, `mine-cli.ts:32`, `duckdb-host.mjs:109`; `cli.ts:48`, `raw-cli.ts:23`). They
   **disagree on strictness**: `cli.ts` exits 2 on an unknown flag, the others silently ignore — so
   `cc-assay mine --replays` (a typo for `--replay`) runs a full mine with no replay grain and no
-  complaint. One `cc-assay/src/args.ts`. Note `raw-cli.ts` disappears with `PLAN.md` §9.
+  complaint. One `cc-assay/src/args.ts`. Note `raw-cli.ts` disappears with `CLEANUP-PLAN.md` §9.
 - **The AWS SSO error-disambiguation block, verbatim twice** — `export-cli.ts:159-177` and
   `duckdb-host.mjs:314-330`.
 - **`prepare()` in `timeline-client.ts:148-160`** awaits `loadForkEdges`, `loadGhostSessions`,
@@ -115,7 +118,7 @@ also removing `export.test.ts:68-123` and the `bytes` field on `ShardEntry` (`ex
   round-trips before first paint. Not a size problem, but it is on the critical path.
 - **Transcript classification, three copies** — `scan.ts:77-82 kindOf`, `raw-source.ts:162-171`
   (whose own comment admits "Mirrors `scan.ts`"), `raw.ts:114 classify`. Two of the three disappear
-  with `PLAN.md` §9; unify what remains before an activity watcher becomes a fourth.
+  with `CLEANUP-PLAN.md` §9; unify what remains before an activity watcher becomes a fourth.
 
 ---
 
@@ -131,7 +134,7 @@ around one enum.
 
 Follow `source-mode.ts`'s own pattern — a pure `src/model/corpus-config.ts`, layer 1, storage
 injected, exhaustively testable, resolving URL → storage → default exactly as `resolveMode` does,
-plus one `durableSignal` (**not** a `control` — a path is not a slider). Small work **if `PLAN.md`
+plus one `durableSignal` (**not** a `control` — a path is not a slider). Small work **if `CLEANUP-PLAN.md`
 §10 lands first**; otherwise every iteration forces a full app reload.
 
 `corpusDir()` is duplicated deliberately (`host-runtime.mjs:48-60`) and must not be "fixed" into an

@@ -3,7 +3,8 @@
 Things the review proposed that we are **not** doing — including one that measured well and is still
 being declined. Recorded so they are not re-proposed, and so the reasoning survives.
 
-Agreed work is in [`PLAN.md`](./PLAN.md); deferred-but-alive items are in
+Current agreed work is in [`PLAN.md`](./PLAN.md); the completed cleanup pass, whose § numbers the
+notes below refer to, is [`CLEANUP-PLAN.md`](./CLEANUP-PLAN.md). Deferred-but-alive items are in
 [`BACKLOG.md`](./BACKLOG.md). file:line references are from `d406ddf`.
 
 ---
@@ -113,7 +114,7 @@ one does.
 `normalize.test.ts` (1067 lines, 14 describes) and `timeline.test.ts` (728, 11 describes) are
 one-describe-per-behaviour and are exactly the exhaustive layer-1 suites `CLAUDE.md` demands.
 
-They should not be split **ahead of** their source. When `normalize.ts` splits (`PLAN.md` §11), the
+They should not be split **ahead of** their source. When `normalize.ts` splits (`CLEANUP-PLAN.md` §11), the
 fork-lineage block at `normalize.test.ts:542-940` moves with it — that is the correct trigger.
 
 ---

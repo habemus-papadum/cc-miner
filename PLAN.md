@@ -1,269 +1,339 @@
-# Cleanup plan — DONE (2026-07-31)
+# Plan — navigation, jobs, and the always-on host
 
-> All items below are applied and committed, except §13 which was dropped.
-> A `hostIsLive` fix was added mid-execution as §0 — see the note under Order.
+The staged execution order for [`ARCHITECTURE.md`](./ARCHITECTURE.md). Decided 2026-07-31.
+`D1`–`D9` below are that document's decisions.
 
-Decided 2026-07-31 from the four-way review in the previous session. Everything here is agreed and
-scoped. Anything *considered* and shelved is in [`BACKLOG.md`](./BACKLOG.md); anything considered and
-turned down is in [`DECLINED.md`](./DECLINED.md).
+The completed cleanup pass is [`CLEANUP-PLAN.md`](./CLEANUP-PLAN.md). Considered-and-shelved is
+[`BACKLOG.md`](./BACKLOG.md); considered-and-turned-down is [`DECLINED.md`](./DECLINED.md).
+file:line references are from `148f9c5`. **None of this is applied yet.**
 
-file:line references are from `d406ddf`. **None of this is applied yet.**
+Method notes that cost time last round, and still apply:
 
-Two method notes that cost time last round:
-
-- **This shell aliases `grep` to `ugrep`, which silently under-reports.** Use `/usr/bin/grep` for any
-  reference count you are going to act on.
-- Every step below should end green on `pnpm lint && pnpm typecheck && pnpm -r test`. The packaged
-  smoke (`pnpm -C pdum-cc-miner pack:dir && pnpm -C pdum-cc-miner smoke`) is the gate for anything
-  touching `electron/`, `server/`, or the DuckDB wiring.
-
----
-
-## Order
-
-Shipped bugs first (they are user-visible and independent), then the one-line trap fix, then
-deletions, then the splits. Deletions before splits deliberately: removing the `raw` layer shrinks
-`cc-assay` before `normalize.ts` gets restructured.
-
-| # | item | scope |
-| --- | --- | --- |
-| 1 | Empty-state panel prints an unusable command | `src/ui/App.tsx` |
-| 2 | Replay panel, same defect | `src/ui/SessionReplay.tsx` |
-| 3 | "Release notes" button is dead in every shipped build | `electron/updater.mjs` |
-| 4 | Delete `serve:s3` | `pdum-cc-miner/package.json` |
-| 5 | One `format.ts` — six `usd` copies that disagree | `src/ui/*` |
-| 6 | Declare `@types/node` in both subpackages | two manifests |
-| 7 | Stale comments describing removed behaviour | 6 files |
-| 8 | Delete `--flat` / `PDUM_CC_MINER_FLAT` | host + sidecar |
-| 9 | Delete the `raw` ingest layer | `cc-assay`, 7 files |
-| 10 | Split `store.ts` | `src/model/` |
-| 11 | Split `normalize.ts` | `cc-assay/src/` |
-| 12 | Split `graph.ts` | `src/model/` |
-| ~~13~~ | ~~Bundle cc-assay into the packaged app~~ — **dropped**: cc-assay is likely to be folded into a single package, so this would be work against a shape that is about to change | — |
-
-**§0, added during execution.** `hostIsLive()` proved a *pid* existed, not that it was our sidecar
-or that anything was listening. A dead sidecar's runtime file survived, macOS recycled its pid onto
-a Helper process of the installed app, and every launch then trusted a port with nothing on it —
-the intermittent host-mode failure that had twice been misattributed to whatever else had changed.
-The socket is now the authority. Reproduced deliberately (a runtime file naming a dead port and a
-live pid) rather than waited for.
-
-**§13 was dropped**, not deferred: cc-assay is likely to be folded into a single package, and
-bundling it now would be work against a shape that is about to change. The three blockers it
-documented are real and recorded in `BACKLOG.md` under "Run the miner from the UI".
+- **This shell aliases `grep` to `ugrep`, which silently under-reports.** Use `/usr/bin/grep` for
+  any reference count you are going to act on.
+- Every step ends green on `pnpm lint && pnpm typecheck && pnpm -r test`.
+- The packaged smoke (`pnpm -C pdum-cc-miner pack:dir && pnpm -C pdum-cc-miner smoke`) is the gate
+  for anything touching `electron/`, `server/`, or the DuckDB wiring — **and it needs a corpus**, so
+  it is manual, not CI.
 
 ---
 
-## 1. Empty-state panel prints a command that cannot work
+## Order, and why this order
 
-`pdum-cc-miner/src/ui/App.tsx:61` shows `pnpm -C pdum-cc-miner normalize`. Three faults: it writes
-the **flat** layout the app cannot read; it writes to `--out ../pdum-cc-miner/src/data`, a deleted
-directory nothing reads; and because production builds are host-only, **this panel is what a `.dmg`
-user sees** — no checkout, no pnpm, no `cc-assay`.
+| stage | what | unblocked by | ships |
+| --- | --- | --- | --- |
+| **A** | Navigation + a second screen | — | back/forward that works in both shells; a Diagnostics screen |
+| **B** | Fold `cc-assay` in | — (independent of A) | one package; the miner's code inside the `.dmg` |
+| **C** | Job runner in the host | B | `mine` from the UI |
+| **D** | Event stream + activity watch | C | live job progress; "new activity" notice |
+| **E** | Config: where the data lives | A, C | a real Settings screen |
+| **F** | Retire local mode | C, E | one data path |
 
-Fixing the string is necessary but not sufficient. Lead with the **directory**
-(`~/.cache/cc-miner`) — the one fact a packaged user can act on, since they can point
-`PDUM_CC_MINER_CORPUS` at a corpus copied from elsewhere — then give `pnpm -C cc-assay mine` as the
-developer path, and say in a comment that the real fix is running the miner from the UI.
+**A before everything** because it is self-contained, touches no backend, and every later stage
+needs somewhere to put a screen. Its second screen is **Diagnostics** rather than Settings on
+purpose: Settings needs a host that can be reconfigured (Stage E), while Diagnostics needs nothing
+that does not already exist, is immediately useful given how host-mode failures have presented here,
+and — because boot is view-driven (`graph().dataset` is a cell) — **is reachable when the dashboard
+is broken.** That property is what makes it worth building first, and §A4 protects it.
 
-## 2. Replay panel has the same defect
+**B before C** is the one hard dependency, and it is D8: the packaged app cannot run the miner today
+for two reasons that are both packaging, not plumbing — the `electron-builder.yml` allowlist
+excludes `node_modules/@habemus-papadum/**`, and `cc-assay` is TypeScript run through `tsx`, which
+is a devDependency the bundle does not have. Building the job runner first would mean writing it
+against a module layout about to change.
 
-`pdum-cc-miner/src/ui/SessionReplay.tsx:241` prints
-`pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data --replay`. Correct:
-`pnpm -C cc-assay mine --replay`. Verified — `mine-cli.ts:56` forwards `--replay` to stage 1 and
-`export-cli.ts:106-127` carries `replay/` and `replay/index.json` into the corpus.
+**A and B are independent** and can be done in either order, or in parallel.
 
-**Also in scope, and flagging it because it sits inside a section that was otherwise deferred:**
-`cc-assay/README.md:9,18-20` and `cc-assay/src/cli.ts:6` still document the flat-corpus quickstart
-that `mine` was written to close, and **the cc-assay README never mentions `mine` at all**. That is
-the same "we print a command that misleads" bug as §1 and §2. The `normalize` *script* stays (see
-`BACKLOG.md`) — this is only the documentation that misdirects people to it. Say so if you'd rather
-it waited.
+**E and F are not committed to.** They are planned to the same level as the rest so the shape is
+visible, but the decision to start them comes after D lands.
 
-## 3. "Release notes" is dead in every shipped build
+---
 
-`electron/updater.mjs:30` — `FEED_REPO` comes only from `PDUM_CC_MINER_RELEASE_REPO`, which nothing
-sets: not `release.yml`, not `pack.mjs`. The guard at `:84` is therefore never true. The repo is
-already compiled into the bundle from `electron-builder.yml`'s `publish:` block; fall back to it.
+# Stage A — navigation
 
-## 4. Delete `serve:s3`
+No backend change. One new dependency: none.
 
-`pdum-cc-miner/package.json:34` ends in a bare `--s3-prefix` with no value, and `arg()`
-(`server/duckdb-host.mjs:109-112`) returns `undefined` for a trailing flag — so it **silently serves
-the local corpus**. Delete the script.
+## A1. The router
 
-Consider also making a valueless `--s3-prefix` exit non-zero in `duckdb-host.mjs`, so the footgun
-cannot come back through a hand-typed command. Asking for S3 and quietly getting local is the same
-class of lie as a data mode falling back, which this codebase refuses everywhere else.
+New `pdum-cc-miner/src/model/route.ts` — layer 1, pure, exhaustively testable in the manner of
+`source-mode.ts`.
 
-## 5. One `format.ts`
+```
+parseRoute(pathname): Route          // total; unknown → NotFound, never throws
+routePath(route): string             // the inverse
+```
 
-Six copies of `usd` and they **disagree**: `ProjectFilter.tsx:26` uses `toFixed(0)`/`toFixed(2)`,
-`Summary.tsx:24` adds a `>= 100` tier, and `SessionTimeline.tsx:79`, `Sessions.tsx:20`,
-`SessionDetail.tsx:34`, `Attribution.tsx:14` are identical to each other. Also `when` twice, and
-**`dur` in three mutually incompatible forms** — milliseconds in two files, seconds in
-`Sessions.tsx:21`.
+`Route` is a discriminated union, starting at `{kind: "dashboard"} | {kind: "diagnostics"} | {kind: "notFound"}`.
 
-New `src/ui/format.ts`. This is a real cosmetic bug, not merely duplication: pick the intended
-behaviour per formatter rather than blindly taking the majority.
+Then a thin reactive layer — a `route` signal seeded from `location.pathname`, subscribed to
+`popstate`, plus `navigate(route)` doing `pushState`. Roughly thirty lines (D4).
 
-## 6. Declare `@types/node` in both subpackages
+Two things to get right:
 
-It is declared **only** at the root but required by `cc-assay/tsconfig.json:5` and
-`pdum-cc-miner/tsconfig.node.json:18` via `types: ["node"]`. Both packages typecheck purely because
-TypeScript walks up to root `node_modules`; removing the root entry fails immediately with
-`TS2688: Cannot find type definition file for 'node'`.
+- **Not a durable root.** The URL is the storage. A durable copy is a second source of truth that
+  survives a reload the URL already survived, and they can disagree.
+- **`scopedState`/`appScope` are not involved.** This is not app state; it is where the window is
+  pointed.
 
-The root prune itself is deferred (`BACKLOG.md`), but do this now — it removes a trap that will
-otherwise fire the moment anyone touches the root manifest.
+Tests: `parseRoute`/`routePath` round-trip for every variant, unknown paths, trailing slashes, and
+paths carrying a query string (`?source=host` must survive navigation — see A5).
 
-## 7. Stale comments describing behaviour that no longer exists
+## A2. The shell and the screens
 
-- The **`/quack` proxy was removed** (`server/host-runtime.mjs:10-31` explains why at length), but
-  three places still promise it: `server/vite-plugin.ts:5`, `vite.config.base.ts:49`,
-  `pdum-cc-miner/README.md:33`.
-- `vite.electron.config.ts:4-5` — "There is no packaging story yet." Four releases stale.
-- `electron/smoke.mjs:24` — "`src/data` is already a Hive corpus." It is gone, and it was flat.
-- `server/host-runtime.mjs:187` and `pdum-cc-miner/README.md:249` advertise `pnpm serve --flat` as
-  "the legacy flat src/data layout" — both the flag (§8) and the directory are going.
+`src/ui/App.tsx` splits:
 
-## 8. Delete `--flat` and `PDUM_CC_MINER_FLAT`
+| file | what |
+| --- | --- |
+| `ui/App.tsx` | the shell: header, `SourceSwitch`, the breadcrumb, and a `<Switch>` over `route()` |
+| `ui/Dashboard.tsx` | everything inside today's `CellView` — moved verbatim, no edits |
+| `ui/Diagnostics.tsx` | new |
 
-`server/duckdb-host.mjs:148,158,196,218` (`FLAT_GLOB`, the `flat` argument, both glob branches) and
-`electron/duckdb-sidecar.mjs:70,73`.
+`Dashboard.tsx` must be a **pure move**. Anything that looks like an improvement while moving it
+belongs in a separate commit; the whole value of this step is that its diff is mechanical.
 
-Nothing writes a flat corpus to a path the app reads by default. `mine` puts the flat intermediate
-in `<corpus>/.staging`, which `corpusFile()` (`host-runtime.mjs:87-89`) explicitly refuses to serve.
-Also update the no-host error at `host-runtime.mjs:187`, which names the flag — `host-runtime.test.ts:73`
-only asserts `/pnpm serve/`, so no test change is needed.
+The breadcrumb is a component (D5): `‹ Dashboard` when not on the dashboard, absent when on it.
+`history.back()` when there is history to go back to, `navigate(dashboard)` otherwise — a
+deep-linked tab has no back entry, and a dead-looking control is worse than one that navigates.
 
-## 9. Delete the `raw` ingest layer
+Lazy-load screens other than the dashboard with `import()` + `<Suspense>`. Cheap now, and it is what
+keeps "many screens" a bytes question rather than a runtime one (D1).
 
-`cc-assay/src/raw-cli.ts`, `raw.ts`, `raw-source.ts`, `raw-parquet.ts`, `raw-run.ts`, plus
-`raw.test.ts` and `raw-equivalence.test.ts`. Then: the `raw` script in `cc-assay/package.json:27`,
-`--raw` in `cli.ts:51,62,65,71-74`, and `RunOptions.rawDir` in `run.ts:26,90,130-133`.
+## A3. Diagnostics
 
-It is a second, untravelled ingest route: reachable only via its own CLI, and **`mine` never touches
-it** (`mine-cli.ts:68-83` runs `cli.ts` then `export-cli.ts` only).
+Read-only, and everything it shows is already available:
 
-Two things to check on the way out: `hyparquet` is a `cc-assay` dependency used at
-`raw-source.ts:17` — confirm with `/usr/bin/grep` whether anything else needs it before removing it
-from the manifest. And `raw-equivalence.test.ts` is the only thing asserting the two ingest routes
-agree; deleting the route deletes the reason that test exists, which is correct, but note it in the
-commit so it does not read as lost coverage.
+- host lookup: the raw `GET /__duckdb-host` answer — `ok`, `quackUri`, `grains`, `missing`, `source`
+- corpus: the resolved directory, and `manifest.json`'s `generatedAt` / `pricing` / `invariants`
+- app: version, shell (`HOST` from `src/host.ts`), data mode, `MODES` this build has
 
-## 10. Split `store.ts` (746 lines, six responsibilities)
+Fetch the lookup **on mount, every time** — `hostInfo()` is deliberately read per request so a host
+restart is picked up with nothing to invalidate (`host-runtime.mjs:141-148`), and a screen that
+cached it would throw that away.
 
-Do this **before** the config feature. `CLAUDE.md` calls this file "guarded, rarely-edited wiring…
-editing it forces a full reload" — already false, since two of its six concerns are ordinary widget
-state that developers will touch constantly.
+Explicitly **do not** call `store.ensureLoaded()` here. That is the point of the screen.
 
-- **new `src/model/scope.ts`** (~30) — `appScope`, `scopedState`. **Load-bearing, do this first:**
-  without it `crossfilter.ts` needs `appScope` from `store.ts` while `store.ts` needs `filter` from
-  `crossfilter.ts` — a cycle.
-- **new `src/model/crossfilter.ts`** (~200) — `filter`, `viewFilter`, `filterVersion`, `filterSql`,
-  `filterActive`, `brushRange`/`brushTime`, `visibleProjects` and friends.
-- **new `src/model/view-state.ts`** (~90) — collapsed projects, expanded sessions, focus. No engine
-  dependence; currently trapped behind the reload wall for no reason.
-- **new `src/model/corpus.ts`** (~90) — `TABLES`, `OPTIONAL_TABLES`, `Manifest`, `CorpusSummary`,
-  `LoadProgress`, plus a shared `summarySql(where)`.
-- `store.ts` keeps boot/engine, source mode, replay, and the `store` façade (~330).
+## A4. The `app://` fallback
 
-**Consumer churn should be zero** — keep the `store` object literal re-exporting, and the nine
-importers stay untouched. Do **not** move `filterSql()` into a pure module: it reads live Mosaic
-`Selection` state and is layer 2 by nature. Also update `CLAUDE.md`, whose description of this file
-will no longer be true.
+`electron/app-scheme.mjs:182` currently 404s unknown paths, with a comment defending that. Preserve
+the reason, narrow the rule (D3):
 
-## 11. Split `normalize.ts` (1626 lines; the `Normalizer` class alone is 992)
+> Fall back to `index.html` only for `GET` requests whose `Accept` header includes `text/html`.
+> Everything else keeps its 404.
 
-Mechanical, zero behaviour change:
+Replace the existing comment rather than deleting it — it explains why an unconditional fallback is
+wrong, which is still true and is what stops the next person widening this.
 
-- **new `cc-assay/src/grains.ts`** (~390) — the ten row interfaces (`TurnRow` … `NormalizeStats`).
-  Type-only. The win: `parquet.ts` stops importing a 1000-line class module for nine type names.
-- **new `cc-assay/src/invariants.ts`** (~105) — `checkInvariants` + `InvariantResult`, already
-  independent of the class.
-- `normalize.ts` drops to ~700.
+Vite handles dev and preview already; verify rather than assume (`curl -i http://localhost:5173/diagnostics`).
 
-Add both to `cc-assay/src/index.ts` so the published surface is byte-identical.
+## A5. Gates
 
-Optional and worth it if the first step goes smoothly: `agentRunRows`, `sessionRows`, `forkEdgeRows`,
-`lineageRows`, `billedAnchor` are already near-pure → `rollups.ts`, taking `normalize.ts` to ~400.
+- `pnpm typecheck && pnpm test && pnpm lint`
+- **Browser:** navigate to Diagnostics, browser-back, forward. Reload on `/diagnostics`. Confirm
+  `?source=host` survives navigation, and that switching source from a non-dashboard screen returns
+  somewhere sensible.
+- **Packaged, and this is the one that cannot be checked any other way:** extend `electron/smoke.mjs`
+  to navigate to `/diagnostics`, **reload**, and assert the screen renders. Without the reload the
+  test passes with no fallback at all.
+- Confirm the dashboard's state survives a round trip: brush a range, go to Diagnostics, come back,
+  assert the brush is still applied and **no re-query happened**. That is D1's claim; measure it
+  rather than assert it.
 
-Functions to extract regardless of the file split: `add()` (120 lines, five-way dispatch),
-`turnRow()` (107 — the token/cost loop is a pure function of `(units, fellBack, pricing)`, and it is
-what a pricing change touches), `sessionRows()` (124, three nested loops).
+---
 
-When this lands, the fork-lineage block in `normalize.test.ts:542-940` moves with it.
+# Stage B — one package
 
-## 12. Split `graph.ts` (653 lines)
+Mechanical, and large in file count. Independent of A.
 
-**new `src/model/actions.ts`** (~170) — `kit`, `registerStandardTools(kit)`, `querySql`, `brush`,
-`inspectSession`, `setSource`, `foldProjects`. `graph.ts` keeps the 13 cells.
+## B1. Move the source
 
-Cheap, and both planned features add *a cell and an action*; separated, each list stays readable.
+`cc-assay/src/**` → `pdum-cc-miner/src/assay/**`, keeping `index.ts`'s barrel shape. Consumers
+inside the moved tree change import paths; nothing outside imports `@habemus-papadum/cc-assay`
+today (verified during the cleanup review), so the blast radius is the tree itself plus the two
+manifests.
 
-Kill while in there: the "focused session, else the priciest" block is byte-identical at `:365-371`
-and `:432-439`; `attribution` (`:192-211`) and `attributionTotals` (`:147-159`) are the same
-three-arm `UNION ALL` with and without the filter; `liveSummary`'s inline type (`:279-289`) restates
-`CorpusSummary` field for field and its SQL restates `querySummary`.
+Delete `cc-assay/` and its workspace entry. Remove the `@habemus-papadum/cc-assay` dependency and
+the `normalize` script from `pdum-cc-miner/package.json`.
 
-## 13. Bundle cc-assay into the packaged app — inclusion only
+Test files move with their sources. `pnpm -r test` becomes one suite; check the vitest config picks
+up the new directory. `cc-assay/README.md` and `LAYOUT.md` move too — `source.ts:78` points at the
+latter.
 
-**Scope, deliberately narrow: the miner's code ships inside the app and can be loaded by Node.**
-Not in scope — running it from the UI, progress reporting, the process model, or the fact that a
-naive call would block. Those are design questions for later and are sketched in `BACKLOG.md`.
+**The user-visible strings change with it.** Four places print `pnpm -C cc-assay …`, and all four
+were just corrected in the cleanup pass for printing commands that could not work — do not let this
+move reintroduce that: `src/ui/App.tsx:72`, `src/ui/SessionReplay.tsx:240`, `src/model/source.ts:96`,
+and `cc-assay/README.md`. Nothing *imports* `@habemus-papadum/cc-assay` (verified: every remaining
+mention in `src/`, `server/` and `electron/` is a comment or a printed string), so the code blast
+radius really is the moved tree plus the two manifests.
 
-### Why the code is absent today
+## B2. Make it runnable inside the bundle
 
-Three independent blockers, and fixing any one alone changes nothing:
+The CLIs run under `tsx`, which the packaged app does not have (D8). Precompile at pack time:
+`electron/pack.mjs` gains a step that emits the assay CLIs to plain `.mjs` under a directory the
+`files` allowlist already covers.
 
-1. **The allowlist excludes it.** `electron-builder.yml` has `!node_modules/@habemus-papadum/**`,
-   written when every package under that scope was renderer-side and already compiled into `dist/`.
-   `@habemus-papadum/cc-assay` is caught by a rule that predates it having any reason to ship.
-2. **cc-assay is TypeScript with no build.** Its `main` is `./src/index.ts`; Node cannot run it.
-3. **The TypeScript runtime is not shipped either.** `tsx` is a `devDependency` and electron-builder
-   bundles only production `dependencies`. `bin/cc-assay.mjs` also shells out to `npx tsx`, which
-   assumes a registry and a `node_modules` that will not exist.
+- Precompile only — **no optimisation, no bundling decisions**. The goal is the code being present
+  and runnable, nothing more.
+- Assert the output exists before packaging, the way `pack.mjs` already asserts the asar size. A
+  missing CLI must fail the pack, not the app.
 
-Already in our favour: `@duckdb/node-api` is **already** a production dependency of the app, already
-bundled and already `asarUnpack`ed for its native `.node`/`.dylib`. The other two cc-assay
-dependencies — `hyparquet`, `hyparquet-writer` — are pure JS.
+**Do not** collapse `server/host-runtime.mjs`'s duplicated `corpusDir()` into an import while doing
+this. It is plain `.mjs` because the Electron main process executes it verbatim; the comment at
+`:48-60` says so. What *is* worth adding here is the missing cross-check: `corpus-dir.test.ts` and
+`server/corpus-route.test.ts` each pin one half and **nothing asserts the two agree**.
 
-### The approach
+## B3. Gates
 
-Precompile cc-assay's node half into a single ESM file **inside the app's own tree**, at
-`pdum-cc-miner/server/miner.mjs`. That one move clears all three blockers: `server/**` is *already*
-in the `files` allowlist so nothing about packaging config changes; there is no `.ts` at runtime; and
-`tsx` is not needed.
+- `pnpm lint && pnpm typecheck && pnpm test`
+- `pnpm mine` end to end, and diff the resulting manifest against one from before the move —
+  invariants and totals identical
+- `pack:dir` + `smoke`, both modes
+- **Verify the CLI actually runs from inside the packaged app** — from `release/`, invoke the
+  precompiled entry directly. This is the claim of the whole stage, and B2 can succeed at packaging
+  while failing at `require`.
 
-- **Bundler:** esbuild. Add it as an **explicit devDependency of `pdum-cc-miner`** — it is present
-  today only transitively via Vite, and depending on a transitive package for a build step is the
-  kind of thing that breaks silently on an unrelated upgrade.
-- **Entry:** a dedicated `cc-assay` entry that pulls in **both** stages. Note `cc-assay/src/node.ts`
-  does **not** export stage 2 today, so bundling it as-is would silently produce a miner that can
-  normalize and not export — precisely the half-working artifact this repo keeps designing against.
-- **External:** `@duckdb/node-api` only. It has native bindings; bundling it would break `.node`
-  resolution. Left external, it resolves from the already-unpacked tree at runtime.
-- **Inlined:** `hyparquet`, `hyparquet-writer`, and cc-assay's own modules.
-- **Where it runs in the build:** in `electron/pack.mjs`, alongside the `vite build` step and for the
-  same stated reason — packaging a stale one produces an artifact that looks fine and is not.
+---
 
-### Acceptance — this is the whole test
+# Stage C — jobs in the host
 
-1. `npx asar list <app>/Contents/Resources/app.asar | /usr/bin/grep miner.mjs` finds it.
-2. The bundle **loads under plain Node with no `tsx`** — e.g. importing it, or a trivial
-   `--help`-style entry. This is the claim that matters: inclusion without loadability is worthless.
-3. `pnpm smoke` still passes, and `app.asar` stays under the 140 MB budget in `pack.mjs`. It is
-   ~89.6 MB today and this adds little, but the budget assertion is the tripwire and should be seen
-   to hold rather than assumed.
+## C1. Libraries under the CLIs
 
-### Notes for whoever does it
+From `BACKLOG.md` → "Run the miner from the UI", verified: `run.ts:89 normalizeCorpus` is already
+the right shape — an exported orchestrator with `onProgress`. **Stage 2 has no equivalent:**
+`export-cli.ts` is a 177-line script with zero exports, and `mine-cli.ts` chains the stages with
+`spawnSync("npx", ["tsx", …])`.
 
-- Do **not** let this become a reason to "fix" the deliberate duplication of `corpusDir()`.
-  `server/host-runtime.mjs:48-60` explains why it must not import across; a bundled miner sitting
-  next to it does not change that argument.
-- Once `hyparquet` and `hyparquet-writer` are inlined they no longer need to be resolvable at
-  runtime — but leave `cc-assay`'s own manifest alone. It is still consumed source-first by the
-  workspace, and that is deliberate.
-- This does **not** make the app able to mine. It makes the code present and loadable, which is the
-  precondition for everything in `BACKLOG.md` → "Run the miner from the UI".
+- new `export-run.ts` exporting `exportCorpus({ onProgress })`, mirroring `run.ts`
+- new `mine.ts` exporting `mineCorpus()`, calling both in-process
+- `mine-cli.ts` shrinks to argument parsing
+- `node.ts` gains `export * from "./export.ts"` — it does not export stage 2 at all today
+
+The CLI remains the single implementation (D6): the job runner spawns it rather than importing these.
+They exist so the CLI is thin and so progress is structured.
+
+## C2. The runner
+
+In `server/duckdb-host.mjs`, not the Electron shell (D6, I2).
+
+```
+POST /__jobs         {kind, args} → {id}
+GET  /__jobs         → running + recent
+GET  /__jobs/:id     → status, exit code, last N lines of output
+```
+
+`electron/duckdb-sidecar.mjs` is the template: idempotent, fork, advertise. One job of a kind at a
+time — a second `mine` against the same corpus is a corruption bug, not a queueing problem, so
+refuse it explicitly rather than serialising silently.
+
+State in memory **plus a small file**, so a renderer reload re-attaches to a running job instead of
+orphaning it.
+
+**Three mounts, as always** (`host-runtime.mjs:4-8`): `mountHostRoutes`, `app-scheme.mjs:serveApp`,
+and the renderer client. `protocol.handle` supports POST, so no IPC (I3).
+
+## C3. The Import screen
+
+A route (D2). Start a mine, watch it, see the result. Until Stage D it polls `GET /__jobs/:id`;
+polling is the honest v1 and D replaces it with a stream.
+
+When it succeeds it must **reload** rather than mutate state in place — `setSourceMode`'s reasoning
+applies verbatim (`store.ts:161`): the registered files and every cached table belong to the corpus
+that just changed underneath them.
+
+`ui/App.tsx:53`'s `NoData` panel gets a button to this screen. That comment names running the miner
+from the app as the real fix; this is where it is delivered, and the comment should be updated
+rather than left claiming a gap that closed.
+
+## C4. Gates
+
+- `pnpm typecheck && pnpm test && pnpm lint`
+- Dev: `pnpm serve` + `pnpm dev`, run a mine from the UI, corpus updates, dashboard reflects it
+- **Packaged:** `pack:dir`, run a mine from inside the app, with **no checkout on `PATH`**. This is
+  what B and C exist for and the only run that proves it.
+- Kill the host mid-job; confirm the UI reports a failed job rather than a spinner
+- Reload the renderer mid-job; confirm it re-attaches
+
+---
+
+# Stage D — the event stream
+
+## D1. Transport
+
+`hostInfo()` (`server/host-runtime.mjs:181`) gains `eventsUri`, beside `quackUri`, built the same
+way — from what was actually bound. The page uses it verbatim (I1). SSE, not WebSocket (D7). Token
+in the query string, because `EventSource` cannot set headers.
+
+Job progress moves from polling to the stream; C3's polling path is deleted, not kept as a fallback
+(I4 — a fallback here would silently mask a broken stream).
+
+## D2. Activity watching
+
+`fs.watch` over `defaultRoots()`, debounced, in the host. **Unify transcript classification first** —
+`BACKLOG.md` records the copies that survived the cleanup, and a watcher that classifies files is
+about to become one more.
+
+Per D7 and I4, the event is a **notice**, not a refresh: "N sessions since your snapshot", and the
+user triggers a re-mine. Do not attempt incremental append; it is listed as open in
+`ARCHITECTURE.md` §5 for a reason.
+
+Belongs as a **cell in `graph.ts`**, not a signal in `store.ts` — it is disposable logic, and this is
+precisely the case the `CLAUDE.md` reload rule was written for.
+
+## D3. The visibility rule
+
+This is the stage where `ARCHITECTURE.md` §4's rule becomes load-bearing. Before wiring any push to
+the crossfilter, give Mosaic clients a way to say they are not visible. Cheapest correct version:
+disconnect on unmount and reconnect on mount, since the coordinator is a durable root and survives
+the component either way.
+
+## D4. Gates
+
+- Job progress arrives without polling; the network tab shows one open stream, not a request per
+  second
+- Kill the host: the stream reconnects when it returns, and the UI says so in between
+- Touch a transcript; the notice appears; **assert the dashboard's numbers did not change**, because
+  that is the invariant (I4)
+- Navigate away from the dashboard during activity; confirm the timeline client is not querying
+
+---
+
+# Stage E — where the data lives
+
+Not started until D lands. Shape, from `BACKLOG.md` → "Config for data location":
+
+Painful in exactly one place, **`store.ts`**: `resolveSource(mode, …)` takes only a mode, and a
+location is a second axis — `sourceMode` / `MODES` / `sourceLabel` / the `setSource` action are all
+written around one enum.
+
+Follow `source-mode.ts`'s pattern: a pure `src/model/corpus-config.ts`, layer 1, storage injected,
+resolving URL → storage → default exactly as `resolveMode` does, plus one `durableSignal` — **not a
+`control`**; a path is not a slider.
+
+The host also has to *accept* a new location, which is what makes this depend on C: changing it
+means restarting the host with new arguments, and the job runner is where host supervision lives.
+
+The Settings screen is then a route with two fields and a restart.
+
+---
+
+# Stage F — retire local mode
+
+Not started until E lands, and reversible up to that point (D9).
+
+Expect **no size win** — duckdb-wasm stays, because it is in the page to speak Quack's wire format,
+not to hold data. What goes: `source.ts`'s byte-fetching path, `/__corpus` in all three mounts,
+`selectShards` and its tests, the `bytes` field on `ShardEntry`, and the two-mode branch in boot.
+
+One commit, not a slow rot. `CLAUDE.md`'s "Two hosts, one renderer" section and the four numbered
+designs both need rewriting in the same commit — design #1 (*no fallback between data modes*) stops
+being about modes and becomes about locations.
+
+---
+
+## What this plan does not do
+
+- **Session permalinks** — `ARCHITECTURE.md` D2. Blocked on what a URL-owned `focusedSession` means
+  under a filter.
+- **Incremental corpus refresh** — `ARCHITECTURE.md` §5.
+- **Multiple windows** — D1 says pay for it when two views must be visible at once.
+- **The dependency prune** — still `BACKLOG.md`, and Stage B changes its inputs, so it should not be
+  attempted first.
