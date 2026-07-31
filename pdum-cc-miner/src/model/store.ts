@@ -23,12 +23,42 @@
  */
 
 import type { AsyncDuckDB, AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
-import { control, scope } from "@habemus-papadum/aiui-viz";
-import { clausePoints } from "@uwdata/mosaic-core";
-import { Coordinator, Selection } from "@uwdata/vgplot";
+import { control } from "@habemus-papadum/aiui-viz";
+import { Coordinator } from "@uwdata/vgplot";
 import { BUNDLES, instantiateDuckDB } from "../duckdb";
-import { type DurableState, durableState, toggled } from "./durable-state";
+import type { CorpusSummary, LoadProgress, Manifest } from "./corpus";
+import { OPTIONAL_TABLES, TABLES } from "./corpus";
+import {
+  brushRange,
+  clearAllFilters,
+  filter,
+  filterActive,
+  filterSql,
+  filterVersion,
+  setVisibleProjects,
+  toggleProjectVisible,
+  visibleProjects,
+} from "./crossfilter";
 import { plainRow } from "./rows";
+import { appScope } from "./scope";
+import { collapsedProjects, expandedSessions, focusedSession } from "./view-state";
+
+export * from "./corpus";
+export {
+  brushRange,
+  clearAllFilters,
+  filter,
+  filterActive,
+  filterSql,
+  setVisibleProjects,
+  toggleProjectVisible,
+  viewFilter,
+} from "./crossfilter";
+// Re-exported so the nine importers and src/index.ts are untouched by the split.
+// store.ts remains the one place a component asks for any of this.
+export { appScope } from "./scope";
+export { focusSession, setAllCollapsed, toggleProject, toggleSession } from "./view-state";
+
 import { type DataSource, resolveSource } from "./source";
 import {
   availableModes,
@@ -46,18 +76,6 @@ import {
 } from "./timeline-client";
 
 /**
- * The app's instance scope: ONE slug qualifying every declaration — controls
- * ("pdum-cc-miner/idleGapMinutes"), durable keys, cells, actions — and naming
- * the graph key and the agent toolkit. Thread it through everything you declare
- * (`control({ scope: appScope, … })`, `appScope.durable(…)`,
- * `cell(deps, compute, { scope: appScope })`, `action({ scope: appScope, … })`):
- * it is what lets this app share a document with other aiui apps — mounted in
- * a gallery shell, or composed as a library — without colliding on the
- * window-global registries. See the user guide's "Composing bigger apps".
- */
-export const appScope = scope("pdum-cc-miner");
-
-/**
  * Where the line falls between "thinking" and "went to lunch", in minutes.
  *
  * A control rather than a constant on purpose: duty cycle is the headline
@@ -73,82 +91,6 @@ export const idleGapMinutes = control({
   unit: "min",
 });
 
-/** The five grains every version of the normalizer writes. */
-export const TABLES = {
-  turns: true,
-  toolCalls: true,
-  events: true,
-  sessions: true,
-  images: true,
-} as const;
-
-/**
- * Grains the normalizer grew later — fork lineage and per-agent runs.
- *
- * Optional because a corpus normalised before they existed simply has no such
- * files, and the host reports which grains it actually resolved. The app runs
- * without them; listing them as required would turn a stale dataset into a
- * blank page, and the sessions are the point even when the lineage is absent.
- */
-export const OPTIONAL_TABLES = {
-  forkEdges: true,
-  agentRuns: true,
-  lineages: true,
-} as const;
-
-export type TableName = keyof typeof TABLES | keyof typeof OPTIONAL_TABLES;
-
-/** What the normalizer recorded about the run that produced this data. */
-export interface Manifest {
-  generatedAt: string;
-  pricing: { source: string; version: string };
-  stats: {
-    files: number;
-    records: number;
-    assistantRecords: number;
-    dedupedTurns: number;
-    naiveOutputTokens: number;
-    dedupedOutputTokens: number;
-    crossFileDuplicates: number;
-    totalCost: number;
-    unpricedTurns: number;
-  };
-  invariants: { ok: boolean; problems: string[] };
-}
-
-export interface CorpusSummary {
-  turns: number;
-  sessions: number;
-  projects: number;
-  firstTs: number;
-  lastTs: number;
-  totalCost: number;
-  costInput: number;
-  costOutput: number;
-  costCacheCreate: number;
-  costCacheRead: number;
-}
-
-export interface LoadProgress {
-  /** 0..1 through the boot steps, or null when the step has no measure. */
-  fraction: number | null;
-  label: string;
-}
-
-/**
- * The staged-write guard, bound to this app's scope.
- *
- * See `durable-state.ts` for why it exists: every toggle here computes its next
- * value from its current one, and a Solid 2 signal read is stale until the next
- * microtask, so rapid clicks all read the same base and only the last survives.
- */
-function scopedState<T>(key: string, initial: T): DurableState<T> {
-  return durableState<T>(
-    appScope.durable<{ v: T }>(`${key}:authority`, () => ({ v: initial })),
-    appScope.durableSignal<T>(key, initial as never),
-  );
-}
-
 // --- durable roots -----------------------------------------------------------
 
 const progress = appScope.durableSignal<LoadProgress>("progress", {
@@ -159,33 +101,6 @@ const ready = appScope.durableSignal<boolean>("ready", false);
 const loadError = appScope.durableSignal<string | null>("loadError", null);
 const manifest = appScope.durableSignal<Manifest | null>("manifest", null);
 const summary = appScope.durableSignal<CorpusSummary | null>("summary", null);
-
-/**
- * The shared crossfilter. Every view publishes its brush here and reads
- * everyone else's — one Selection is what makes this a crossfilter rather than
- * several charts that happen to share a page.
- */
-export const filter: Selection = appScope.durable("filter", () => Selection.crossfilter());
-
-/**
- * The same clauses, but with nothing skipped — what a *drawn layer* should obey.
- *
- * A crossfilter deliberately hides a client's own clause from it
- * (`skip() === cross && clause.clients.has(client)`), so that a chart you are
- * brushing keeps its full data underneath and the drag has something to aim at.
- * That was the right default when a filtered-out mark disappeared. It is the
- * wrong one now that every chart draws an unfiltered base layer: the context is
- * already there in grey, so a chart applying its own brush to its coloured
- * layer is exactly what "the selection is highlighted" means — and not applying
- * it is what made brushing the scatter appear to do nothing to the scatter.
- *
- * `intersect` sets `cross: false`, so nothing is ever skipped; `include` relays
- * every clause published to the crossfilter. Marks filter by this; clauses are
- * still published to `filter`, so *other* clients keep crossfilter semantics.
- */
-export const viewFilter: Selection = appScope.durable("viewFilter", () =>
-  Selection.intersect({ include: filter }),
-);
 
 /** DuckDB + Mosaic live in a durable box so a hot edit never re-instantiates them. */
 interface Engine {
@@ -277,33 +192,6 @@ const timeline = appScope.durableSignal<TimelineData>("timeline", {
 const timelineDomain = appScope.durableSignal<TimelineDomain | null>("timelineDomain", null);
 const timelineBusy = appScope.durableSignal<boolean>("timelineBusy", false);
 const selectionStats = appScope.durableSignal<SelectionStats | null>("selectionStats", null);
-/** The time range currently published to the crossfilter — the drawn brush. */
-const brushRange = appScope.durableSignal<[number, number] | null>("brushRange", null);
-
-/**
- * Collapsed rather than expanded, so the default needs no knowledge of which
- * projects exist: an empty set means every project shows its lanes. Storing the
- * expanded set instead would need a "not yet initialised" sentinel and a first
- * -data hook to fill it in.
- */
-const collapsedProjects = scopedState<ReadonlySet<string>>("collapsedProjects", new Set());
-/** Sessions whose agents are broken out onto their own sub-lanes. */
-const expandedSessions = scopedState<ReadonlySet<string>>("expandedSessions", new Set());
-
-/**
- * The session the drill-down is looking at, or null for "pick the priciest".
- *
- * Deliberately NOT the crossfilter. The drill-down answers a different kind of
- * question from the panels above it — "what happened inside this one session"
- * rather than "how do these dimensions co-vary" — and routing it through the
- * shared Selection would make every other panel collapse to one session the
- * moment you looked at one. One explicit pointer, no filtering.
- */
-const focusedSession = appScope.durableSignal<string | null>("focusedSession", null);
-
-export function focusSession(sessionId: string | null): void {
-  focusedSession.set(sessionId);
-}
 
 const clientBox = appScope.durable<{ timeline: SessionTimelineClient | null }>("clients", () => ({
   timeline: null,
@@ -311,19 +199,6 @@ const clientBox = appScope.durable<{ timeline: SessionTimelineClient | null }>("
 
 /** Which optional grains this dataset actually turned out to have. */
 const loaded = appScope.durable<Set<string>>("loadedTables", () => new Set<string>());
-
-export function toggleProject(project: string): void {
-  collapsedProjects.set(toggled(collapsedProjects.peek(), project));
-}
-
-export function toggleSession(sessionId: string): void {
-  expandedSessions.set(toggled(expandedSessions.peek(), sessionId));
-}
-
-export function setAllCollapsed(projects: readonly string[], collapsed: boolean): void {
-  collapsedProjects.set(collapsed ? new Set(projects) : new Set<string>());
-  if (collapsed) expandedSessions.set(new Set<string>());
-}
 
 /**
  * Brush a time range into the crossfilter, or clear it with `null`. The view
@@ -339,103 +214,6 @@ export function brushTime(range: [number, number] | null): void {
   brushRange.set(range);
   clientBox.timeline?.publish(range);
 }
-
-/**
- * Which projects are visible, or null for "all of them".
- *
- * Null rather than "every project selected" so the default needs no knowledge
- * of which projects exist — the same reasoning as `collapsedProjects`, and it
- * means no clause is published until the reader actually narrows something.
- */
-const visibleProjects = scopedState<ReadonlySet<string> | null>("visibleProjects", null);
-
-/**
- * A stable clause source for the project filter.
- *
- * Stable identity is what makes a Selection *replace* this widget's clause
- * rather than accumulate one per click. It is a bare object because the filter
- * is not a MosaicClient — it publishes but never queries.
- */
-const projectSource = { name: "project-filter" };
-
-/**
- * Show only these projects, or `null` to show all.
- *
- * Publishes a point clause over `project`, so it composes with the timeline's
- * time interval and the scatter's time×cost box exactly like any other clause —
- * and the cell panels pick it up through `filterSql()` with no extra wiring.
- */
-export function setVisibleProjects(projects: ReadonlySet<string> | null): void {
-  visibleProjects.set(projects);
-  filter.update(
-    clausePoints(["project"], projects ? [...projects].map((p) => [p]) : null, {
-      source: projectSource,
-    }),
-  );
-}
-
-/** Toggle one project without disturbing the others. */
-export function toggleProjectVisible(project: string, all: readonly string[]): void {
-  const current = visibleProjects.peek() ?? new Set(all);
-  const next = new Set(current);
-  if (!next.delete(project)) next.add(project);
-  // Back to everything selected means back to no clause at all, so the page
-  // reads as unfiltered rather than as "filtered to all 12".
-  setVisibleProjects(next.size === all.length ? null : next);
-}
-
-/**
- * Drop every clause AND the widget state that produced them.
- *
- * `filter.reset()` alone clears the Selection but leaves `visibleProjects`
- * holding a set, so the chips would keep showing a selection that no longer
- * filters anything. One entry point, so the two cannot drift.
- */
-export function clearAllFilters(): void {
-  visibleProjects.set(null);
-  brushRange.set(null);
-  filter.reset();
-}
-
-/**
- * Bumped whenever the crossfilter changes, so cell-based panels can depend on
- * it and recompute.
- *
- * The panels that aggregate a few hundred rows (daily spend, attribution, the
- * session table) are cells rather than Mosaic clients — see DailySpend.tsx on
- * why. That leaves them outside the coordinator's push, so they need something
- * reactive to key on, and a version counter is the smallest thing that works.
- */
-const filterVersion = scopedState<number>("filterVersion", 0);
-
-/**
- * The crossfilter's current predicate as SQL text, for those cell consumers.
- *
- * Read from the `Selection` itself rather than mirrored from `brushRange`, and
- * that distinction is load-bearing. Mirroring worked while the timeline was the
- * only thing that published a clause; the turn scatter is a second producer
- * with a second dimension (cost), and a mirror of one range would silently
- * ignore it. Asking the Selection means any number of producers compose, which
- * is what a crossfilter is for.
- *
- * `predicate(undefined)` is documented as "a predicate with all clauses" — no
- * client to exclude, which is right: a cell is nobody's source, so nothing
- * should be skipped on its behalf.
- */
-export function filterSql(): string {
-  const p = filter.predicate(undefined);
-  const parts = (Array.isArray(p) ? p : [p])
-    .filter((x) => x != null && x !== true)
-    .map((x) => String(x))
-    .filter((s) => s.length > 0);
-  return parts.length ? parts.join(" AND ") : "TRUE";
-}
-
-/** True when anything is brushed — the panels say so rather than looking empty. */
-export const filterActive = (): boolean => {
-  filterVersion.get(); // subscribe: the predicate itself is not reactive
-  return filterSql() !== "TRUE";
-};
 
 /** Idempotent: the first caller kicks the load, everyone else awaits it. */
 export function ensureLoaded(): Promise<void> {

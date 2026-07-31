@@ -86,7 +86,20 @@ Build thin vertical slices in this order
 (lane packing, fork edges, ghost sessions). Keep it framework-free and time-free.
 
 **store.ts versus graph.ts.** `store.ts` is guarded, rarely-edited wiring — editing it forces a
-full reload, since it is everything's ancestor. `graph.ts` and `ui/` are *disposable logic*:
+full reload, since it is everything's ancestor. That claim used to be false, because store.ts also
+held ordinary widget state; it is now split so the guarded part is genuinely small:
+
+| file | what |
+| --- | --- |
+| `model/scope.ts` | `appScope`, `scopedState`. Its own file to break a cycle — `crossfilter.ts` needs the scope, `store.ts` needs the crossfilter |
+| `model/corpus.ts` | grain constants and the shapes a corpus reports. No engine, no Mosaic, no Solid |
+| `model/crossfilter.ts` | the shared Selection and every widget that publishes a clause into it |
+| `model/view-state.ts` | folded projects, expanded sessions, drill-down focus — edited constantly, no engine dependence |
+| `model/store.ts` | boot, engine, source mode, replay, and the `store` façade |
+
+`store.ts` re-exports everything that moved, so components still import from it alone.
+
+`graph.ts` and `ui/` are *disposable logic*:
 `hotCellGraph` rebuilds the graph over the durable roots on every hot edit, and components read
 `graph().someCell` through the stable accessor so they can never hold a stale cell reference.
 
