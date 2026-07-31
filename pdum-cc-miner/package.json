@@ -31,7 +31,6 @@
     "pack:mac": "node electron/pack.mjs mac",
     "preview": "vite preview",
     "serve": "node server/duckdb-host.mjs",
-    "serve:s3": "node server/duckdb-host.mjs --s3-prefix",
     "smoke": "node electron/smoke.mjs",
     "start:electron": "electron electron/main.mjs",
     "test": "vitest run",
@@ -54,6 +53,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@habemus-papadum/aiui": "^0.12.0",
+    "@types/node": "^26.1.0",
     "electron": "^43.2.0",
     "electron-builder": "^26.15.3",
     "jsdom": "^29.0.0",

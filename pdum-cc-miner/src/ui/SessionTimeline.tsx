@@ -22,6 +22,7 @@
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { brushTime, setAllCollapsed, store, toggleProject, toggleSession } from "../model/store";
 import { hitTest, type LayoutBar, layoutTimeline, timeScale, timeTicks } from "../model/timeline";
+import { dur, usd, when } from "./format";
 
 // --- palette -----------------------------------------------------------------
 //
@@ -75,15 +76,6 @@ const agentColor = (context: string) => AGENT_COLOR[context] ?? "#35a389";
 const GUTTER = 138;
 const PAD_RIGHT = 12;
 const AXIS_H = 22;
-
-const usd = (n: number) => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`);
-const dur = (ms: number) =>
-  ms >= 86400_000
-    ? `${(ms / 86400_000).toFixed(1)}d`
-    : ms >= 3600_000
-      ? `${(ms / 3600_000).toFixed(1)}h`
-      : `${Math.max(1, Math.round(ms / 60_000))}m`;
-const when = (t: number) => new Date(t).toISOString().slice(0, 16).replace("T", " ");
 
 interface Hover {
   bar: LayoutBar;

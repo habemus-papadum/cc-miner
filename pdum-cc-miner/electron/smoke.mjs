@@ -21,8 +21,9 @@
  * libduckdb cannot be dlopen'd — still renders every chart and looks healthy.
  * Host mode is the only path that touches the platform binary.
  *
- * No fixtures are needed for either: `src/data` is already a Hive corpus, so it
- * can play the part of a user's exported one.
+ * No fixture is built or carried: the corpus at ~/.cache/cc-miner IS the thing
+ * under test, which is the point — a fixture would exercise a configuration no
+ * user runs.
  */
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";

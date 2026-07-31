@@ -1,7 +1,7 @@
 /**
  * vite.electron.config.ts — cc-miner in an Electron window. `pnpm dev:electron`.
  *
- * DEV MODE ONLY. There is no packaging story yet: this serves the app from a
+ * The DEV shell. Packaging is `pnpm pack:mac` / `pack:linux`: this serves the app from a
  * Vite dev server exactly like the browser config does, and `electron/main.mjs`
  * opens a BrowserWindow onto it. HMR, the source-locator stamps and the DuckDB
  * WASM bundles all work unchanged, because nothing about them is browser-

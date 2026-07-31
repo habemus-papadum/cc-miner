@@ -46,9 +46,10 @@ export function ccMinerConfig(): UserConfig {
     // exactly the "two artifacts, one claim" trap this split exists to avoid.
     base: "./",
 
-    // duckdbHost() exposes `/quack` and `/__duckdb-host` so the page reaches the
-    // DuckDB process without ever knowing its port. It mounts on the dev server
-    // AND the preview server, so the BUILT app can run host mode too.
+    // duckdbHost() exposes `/__duckdb-host` (where the DuckDB process is) and
+    // `/__corpus` (the shards themselves), so the page needs neither a port nor a
+    // path. It mounts on the dev server AND the preview server, so the BUILT app
+    // can run host mode too. No `/quack` proxy — host-runtime.mjs says why.
     plugins: [aiui(), solid(), duckdbHost()],
 
     build: {

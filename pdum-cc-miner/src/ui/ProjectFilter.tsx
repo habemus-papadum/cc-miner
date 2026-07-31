@@ -22,8 +22,7 @@ import { CellView } from "@habemus-papadum/aiui-viz";
 import { For, Show } from "solid-js";
 import { graph } from "../model/graph";
 import { setVisibleProjects, store } from "../model/store";
-
-const usd = (n: number) => (n >= 1 ? `$${n.toFixed(0)}` : `$${n.toFixed(2)}`);
+import { usd } from "./format";
 
 export function ProjectFilter() {
   return (

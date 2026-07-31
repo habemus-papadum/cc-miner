@@ -155,6 +155,14 @@ async function main() {
   const dataDir = arg("data") ? resolve(APP_ROOT, String(arg("data"))) : corpusDir();
   const s3Profile = arg("s3-profile") ?? null;
   const s3Prefix = arg("s3-prefix") ?? null;
+  // `arg()` yields undefined for a flag with no value, so a bare `--s3-prefix`
+  // used to mean "serve the local corpus" — the one thing someone typing it
+  // cannot have wanted. Asking for S3 and silently getting local is the same
+  // class of lie as a data mode falling back, which this app refuses elsewhere.
+  if (process.argv.includes("--s3-prefix") && !s3Prefix) {
+    console.error("[duckdb-host] --s3-prefix needs a value, e.g. --s3-prefix s3://bucket/cc");
+    process.exit(2);
+  }
   const flat = process.argv.includes("--flat");
 
   const instance = await DuckDBInstance.create(":memory:");

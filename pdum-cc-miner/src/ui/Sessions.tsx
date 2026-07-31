@@ -16,14 +16,7 @@ import { CellView, ControlSlider } from "@habemus-papadum/aiui-viz";
 import { For, Show } from "solid-js";
 import { graph, type SessionShape } from "../model/graph";
 import { focusSession, idleGapMinutes, store } from "../model/store";
-
-const usd = (n: number) => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`);
-const dur = (s: number) =>
-  s >= 86400
-    ? `${(s / 86400).toFixed(1)}d`
-    : s >= 3600
-      ? `${(s / 3600).toFixed(1)}h`
-      : `${Math.round(s / 60)}m`;
+import { dur, usd } from "./format";
 
 function SessionRow(props: { s: SessionShape; maxSpan: number }) {
   const spanFrac = () => (props.maxSpan > 0 ? props.s.spanSeconds / props.maxSpan : 0);
@@ -60,8 +53,8 @@ function SessionRow(props: { s: SessionShape; maxSpan: number }) {
           </div>
         </div>
       </td>
-      <td class="cco-num">{dur(props.s.spanSeconds)}</td>
-      <td class="cco-num">{dur(props.s.activeSeconds)}</td>
+      <td class="cco-num">{dur(props.s.spanSeconds * 1000)}</td>
+      <td class="cco-num">{dur(props.s.activeSeconds * 1000)}</td>
       <td class={`cco-num cco-duty${props.s.dutyCycle < 0.15 ? " cco-duty-low" : ""}`}>
         {(props.s.dutyCycle * 100).toFixed(0)}%
       </td>

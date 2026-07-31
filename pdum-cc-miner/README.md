@@ -30,7 +30,7 @@ pnpm build           # → dist/  (relative base, so it works from any path)
 pnpm preview         # serve the BUILT app, host routes included
 ```
 
-`pnpm preview` mounts the same `/__duckdb-host` and `/quack` routes the dev server does
+`pnpm preview` mounts the same `/__duckdb-host` and `/__corpus` routes the dev server does
 (`server/host-runtime.mjs`, one implementation), so **the built app can run host mode too**.
 Without that, host mode would silently be a dev-server-only feature — the sort of gap that stays
 invisible until someone ships.

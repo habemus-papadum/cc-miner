@@ -26,8 +26,17 @@ const { autoUpdater } = electronUpdater;
 /** How long after launch to check. Long enough not to compete with first paint. */
 const FIRST_CHECK_DELAY_MS = 8_000;
 
-/** Where releases live, if it is not what electron-builder compiled in. */
-const FEED_REPO = process.env.PDUM_CC_MINER_RELEASE_REPO; // "owner/repo"
+/**
+ * Where releases live: an override, else what electron-builder compiled in.
+ *
+ * The fallback is not decoration. `PDUM_CC_MINER_RELEASE_REPO` is set by
+ * nothing — not `release.yml`, not `pack.mjs` — so without it this was always
+ * undefined and the "Release notes" button in the update dialog silently did
+ * nothing in every shipped build. The real repo is compiled into the bundle as
+ * `app-update.yml` from `electron-builder.yml`'s `publish:` block, which is the
+ * same source `autoUpdater` itself reads.
+ */
+const FEED_REPO = process.env.PDUM_CC_MINER_RELEASE_REPO ?? "habemus-papadum/cc-miner";
 
 /**
  * Wire up update checking. Safe to call unconditionally — it decides for itself

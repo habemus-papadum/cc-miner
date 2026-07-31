@@ -30,17 +30,10 @@ import {
   summarise,
 } from "../model/session-detail";
 import { focusSession, idleGapMinutes, store } from "../model/store";
+import { dur, usd, when } from "./format";
 
-const usd = (n: number) => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`);
 const tok = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n);
-const when = (t: number) => new Date(t).toISOString().slice(0, 16).replace("T", " ");
-const dur = (ms: number) =>
-  ms >= 86400_000
-    ? `${(ms / 86400_000).toFixed(1)}d`
-    : ms >= 3600_000
-      ? `${(ms / 3600_000).toFixed(1)}h`
-      : `${Math.round(ms / 60_000)}m`;
 
 /** "1 compaction", "3 compactions" — a stat line that says "1 turns" reads as a bug. */
 const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;

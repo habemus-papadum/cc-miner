@@ -20,11 +20,7 @@ import { CellView } from "@habemus-papadum/aiui-viz";
 import { Show } from "solid-js";
 import { graph } from "../model/graph";
 import { store } from "../model/store";
-
-const usd = (n: number) =>
-  n >= 100 ? `$${n.toFixed(0)}` : n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`;
-const pct = (n: number, of: number) => (of > 0 ? `${((n / of) * 100).toFixed(1)}%` : "—");
-const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+import { day, pct, usd } from "./format";
 
 /** One class of token spend, sized by its share. */
 function ClassBar(props: { label: string; cost: number; total: number; tone: string }) {

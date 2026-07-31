@@ -46,19 +46,30 @@ function Loading() {
 }
 
 /**
- * A missing dataset is the expected state of a fresh checkout — the parquet is
- * gitignored personal telemetry — so it gets real instructions rather than a
- * stack trace.
+ * A missing corpus is the expected state of a fresh install, so it gets real
+ * instructions rather than a stack trace.
+ *
+ * KNOWN GAP, and a feature request rather than a wording problem: production
+ * builds are host-only, so this panel is also what someone who installed the
+ * `.dmg` sees — and they have no checkout, no pnpm, and no `cc-assay` to run.
+ * The command below is right for a developer and useless to them. Naming the
+ * DIRECTORY first is what serves both: it is the one fact a packaged user can
+ * act on, by pointing `PDUM_CC_MINER_CORPUS` at a corpus copied from elsewhere.
+ * The real fix is running the miner from the app; until then, do not pretend
+ * the command is universal.
  */
 function NoData(props: { error: string }) {
   return (
     <div class="cco-nodata">
       <h2 class="cco-h2">no data yet</h2>
       <p>
-        This app reads Parquet generated from your own Claude Code transcripts. The files are
-        gitignored on purpose — they carry project names, branch names and paths.
+        This app reads Parquet mined from your own Claude Code transcripts. It is personal telemetry
+        — conversation text, project names, branch names, paths — so it is never bundled with the
+        app and never leaves your machine. It is read at run time from:
       </p>
-      <pre class="cco-cmd">pnpm -C pdum-cc-miner normalize</pre>
+      <pre class="cco-cmd">~/.cache/cc-miner</pre>
+      <p class="cco-note">Nothing is there yet. From a checkout of the repo, generate it with:</p>
+      <pre class="cco-cmd">pnpm -C cc-assay mine</pre>
       <p class="cco-note">…then reload. The loader reported:</p>
       <pre class="cco-err">{props.error}</pre>
     </div>

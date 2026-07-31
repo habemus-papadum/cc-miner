@@ -10,8 +10,7 @@
 import { CellView } from "@habemus-papadum/aiui-viz";
 import { For } from "solid-js";
 import { graph } from "../model/graph";
-
-const usd = (n: number) => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(3)}`);
+import { usd } from "./format";
 
 interface Slice {
   kind: string;
