@@ -246,7 +246,6 @@ DuckDB's own HTTP remote protocol; the page's duckdb-wasm is kept solely to spea
 that protocol. Zero Parquet bytes reach the browser.
 
 ```sh
-pnpm serve --flat                     # the legacy flat src/data layout
 pnpm serve --data <dir>               # a Hive-partitioned corpus on disk
 pnpm serve --s3-prefix s3://bucket/cc --s3-profile personal
 ```

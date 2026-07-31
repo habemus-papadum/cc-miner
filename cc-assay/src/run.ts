@@ -12,7 +12,6 @@ import type { InvariantResult, Normalized, NormalizeStats } from "./normalize.ts
 import { checkInvariants, Normalizer } from "./normalize.ts";
 import type { PriceTable } from "./pricing.ts";
 import { LITELLM_URL, tableFromJson } from "./pricing.ts";
-import { findHostSets, readHostRecords } from "./raw-source.ts";
 import { ReplayBuilder } from "./replay.ts";
 import { defaultRoots, findTranscripts, readRecords } from "./scan.ts";
 
@@ -23,7 +22,6 @@ export interface RunOptions {
    * what makes multi-machine work, and what makes a schema change cost a
    * re-derive rather than a re-read on every machine.
    */
-  rawDir?: string;
   /** Legacy single-machine path: walk the filesystem directly. */
   roots?: string[];
   pricing: PriceTable;
@@ -87,7 +85,6 @@ export async function loadPriceTable(
 }
 
 export async function normalizeCorpus(options: RunOptions): Promise<RunResult> {
-  if (options.rawDir) return normalizeFromRaw(options, options.rawDir);
   const roots = options.roots ?? defaultRoots();
   const n = new Normalizer({
     pricing: options.pricing,
@@ -116,48 +113,6 @@ export async function normalizeCorpus(options: RunOptions): Promise<RunResult> {
     invariants: checkInvariants(normalized),
     stats: normalized.stats,
     rootsUsed: roots,
-    ...(replay ? { replay: replay.sessions } : {}),
-  };
-}
-
-/**
- * Derive the grains from one or more hosts' raw sets.
- *
- * Every host is fed into a single `Normalizer`, so cross-host dedup happens for
- * free: the same session synced from two machines collapses on `billingKey`
- * exactly as a fork copy does within one machine.
- */
-async function normalizeFromRaw(options: RunOptions, rawDir: string): Promise<RunResult> {
-  const sets = await findHostSets(rawDir);
-  if (sets.length === 0) {
-    throw new Error(`no host sets under ${rawDir} — run \`cc-assay raw\` first`);
-  }
-  const n = new Normalizer({
-    pricing: options.pricing,
-    idleGapSeconds: options.idleGapSeconds,
-    skipImages: options.skipImages,
-  });
-  const replay = options.replay ? new ReplayBuilder() : null;
-  for (const set of sets) {
-    let seen = 0;
-    // The same two-event loop the JSONL path runs, so a file with no readable
-    // records is still registered as a file.
-    for await (const item of readHostRecords(set)) {
-      if (item.kind === "file") n.noteFile(item.file);
-      else {
-        n.add(item.rec, item.file);
-        replay?.add(item.rec, item.file);
-      }
-      if (++seen % 20000 === 0) options.onProgress?.(n.stats.files, n.stats.records);
-    }
-    options.onProgress?.(n.stats.files, n.stats.records);
-  }
-  const normalized = n.finish();
-  return {
-    normalized,
-    invariants: checkInvariants(normalized),
-    stats: normalized.stats,
-    rootsUsed: sets.map((s) => `${s.host.hostname}:${s.dir}`),
     ...(replay ? { replay: replay.sessions } : {}),
   };
 }

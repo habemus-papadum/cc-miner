@@ -5,19 +5,30 @@ Internal, never published — the pure-model half of [`pdum-cc-miner`](../pdum-c
 next door, which reads the Parquet this writes and knows nothing about transcripts.
 
 ```sh
-pnpm -C cc-assay normalize                                 # → ./out
-pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data # feed the app
-pnpm -C cc-assay normalize --offline --no-images
+pnpm -C cc-assay mine                      # both stages → ~/.cache/cc-miner
+pnpm -C cc-assay mine --replay             # …plus message bodies
+pnpm -C cc-assay mine --to s3://bucket/cc --s3-profile personal
 ```
 
-Two things about that invocation, both learned the hard way:
+**`mine` is the command.** It runs both stages, and running only the first is the
+mistake it exists to prevent: `normalize` writes the **flat** grains
+(`turns.parquet`), while the app reads the **Hive** layout
+(`turns/username=…/host=…/…`) in both of its data modes. Point either at a flat
+corpus and it fails obscurely, reporting `no "turns" grain (it reported: …
+turns.parquet)`. The flat intermediate goes to `<corpus>/.staging`, which the app
+deliberately refuses to serve.
+
+The two stages are still available separately for the cases that need them —
+`normalize` for a different `--out`, `export` for an S3 target or a `--months`
+trim.
+
+Two things about these invocations, both learned the hard way:
 
 - **No `--` separator.** pnpm 11 forwards arguments to the script as-is and passes a
   literal `--` straight through, which `parseArgs` then refuses as an unknown
   argument. Every `normalize -- --out` in this repo was broken until 2026-07-30.
-- **`--out` resolves against this package's directory**, not the repo root, because
-  `pnpm -C` sets the CWD. From the app side, `pnpm -C pdum-cc-miner normalize`
-  wraps the second line above.
+- **Paths resolve against this package's directory**, not the repo root, because
+  `pnpm -C` sets the CWD.
 
 ## What it does
 

@@ -144,9 +144,6 @@ const GRAINS = [
  */
 export const LAYOUT_GLOB = "/username=*/host=*/**/*.parquet";
 
-/** Legacy flat layout: `<dir>/<grain>.parquet`, what src/data holds today. */
-const FLAT_GLOB = ".parquet";
-
 async function main() {
   // `--data` wins; otherwise the shared corpus directory (~/.cache/cc-miner).
   // It used to default to `src/data` inside the checkout, which is why a corpus
@@ -163,7 +160,6 @@ async function main() {
     console.error("[duckdb-host] --s3-prefix needs a value, e.g. --s3-prefix s3://bucket/cc");
     process.exit(2);
   }
-  const flat = process.argv.includes("--flat");
 
   const instance = await DuckDBInstance.create(":memory:");
   const conn = await instance.connect();
@@ -201,7 +197,7 @@ async function main() {
   /** @type {{grain: string, err: string}[]} */
   const failures = [];
   for (const grain of GRAINS) {
-    const src = flat ? `${base}/${grain}${FLAT_GLOB}` : `${base}/${grain}${LAYOUT_GLOB}`;
+    const src = `${base}/${grain}${LAYOUT_GLOB}`;
     const sql =
       `CREATE OR REPLACE VIEW "${grain}" AS SELECT * FROM ` +
       `read_parquet('${src}', hive_partitioning=true, union_by_name=true)`;
@@ -223,7 +219,7 @@ async function main() {
   if (failures.length === GRAINS.length) {
     throw new Error(
       `no corpus at ${base} — all ${GRAINS.length} grains failed to open.\n` +
-        `  expected ${base}/<grain>${flat ? FLAT_GLOB : LAYOUT_GLOB}\n` +
+        `  expected ${base}/<grain>${LAYOUT_GLOB}\n` +
         `  first error: ${failures[0]?.err}`,
     );
   }

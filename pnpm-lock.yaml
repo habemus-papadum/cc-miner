@@ -56,9 +56,6 @@ importers:
       '@duckdb/node-api':
         specifier: 1.5.5-r.2
         version: 1.5.5-r.2
-      hyparquet:
-        specifier: ^1.20.0
-        version: 1.26.2
       hyparquet-writer:
         specifier: ^0.16.1
         version: 0.16.1
@@ -2946,9 +2943,6 @@ packages:
 
   hyparquet@1.26.1:
     resolution: {integrity: sha512-Me2psKksCqJGR8+TbalUYUyK4Ao+ReA6XmMSiOVPhOBswULbl3ojT06PQajyTafbNPW1vD0tCA7H6dXJAC1TPw==}
-
-  hyparquet@1.26.2:
-    resolution: {integrity: sha512-6qjyK7R2tZ4vnYP1J8NpcCeDPK1UIYk3xh5XgtQUnUM1iwkYbvI6Mz3xtmpMd6AfCCeoUoJVbEq29k5GReZRWA==}
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -7452,8 +7446,6 @@ snapshots:
       hyparquet: 1.26.1
 
   hyparquet@1.26.1: {}
-
-  hyparquet@1.26.2: {}
 
   iconv-lite@0.6.3:
     dependencies:

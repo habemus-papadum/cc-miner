@@ -63,14 +63,9 @@ function hostArgs() {
   const s3Prefix = process.env.PDUM_CC_MINER_S3_PREFIX;
   const s3Profile = process.env.PDUM_CC_MINER_S3_PROFILE;
   if (s3Prefix) {
-    return [
-      "--s3-prefix",
-      s3Prefix,
-      ...(s3Profile ? ["--s3-profile", s3Profile] : []),
-      ...(process.env.PDUM_CC_MINER_FLAT === "1" ? ["--flat"] : []),
-    ];
+    return ["--s3-prefix", s3Prefix, ...(s3Profile ? ["--s3-profile", s3Profile] : [])];
   }
-  return ["--data", corpusDir(), ...(process.env.PDUM_CC_MINER_FLAT === "1" ? ["--flat"] : [])];
+  return ["--data", corpusDir()];
 }
 
 /** Is the advertised host still the process we started, and still alive? */

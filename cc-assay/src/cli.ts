@@ -2,8 +2,12 @@
 /**
  * `cc-assay` — scan Claude Code transcripts, write the five Parquet tables.
  *
- *   pnpm -C cc-assay normalize                    # → ./out
- *   pnpm -C cc-assay normalize --out ../pdum-cc-miner/src/data
+ * Stage 1 of two. This writes the FLAT grains; `cc-assay export` turns them into
+ * the Hive layout the app reads. **`cc-assay mine` runs both** and is what you
+ * almost always want — see mine-cli.ts.
+ *
+ *   pnpm -C cc-assay mine                         # both stages → ~/.cache/cc-miner
+ *   pnpm -C cc-assay normalize                    # stage 1 only → ./out
  *   pnpm -C cc-assay normalize --offline --no-images
  *
  * Note there is **no `--` separator**. pnpm 11 forwards arguments as-is and hands
@@ -27,8 +31,6 @@ import { defaultRoots } from "./scan.ts";
 
 interface Args {
   out: string;
-  /** Derive from a raw host set (stage 1) instead of walking the filesystem. */
-  rawDir?: string;
   replay?: boolean;
   roots?: string[];
   offline: boolean;
@@ -48,7 +50,6 @@ function parseArgs(argv: string[]): Args {
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === "--out") a.out = path.resolve(argv[++i]);
-    else if (k === "--raw") a.rawDir = path.resolve(argv[++i]);
     else if (k === "--root") {
       a.roots ??= [];
       a.roots.push(path.resolve(argv[++i]));
@@ -59,19 +60,18 @@ function parseArgs(argv: string[]): Args {
     else if (k === "--quiet") a.quiet = true;
     else if (k === "--help" || k === "-h") {
       process.stdout.write(
-        "usage: cc-assay [--out dir] [--raw dir | [--root dir]...] [--offline]\n" +
+        "usage: cc-assay [--out dir] [--root dir]... [--offline]\n" +
           "                [--no-images] [--idle-gap seconds] [--quiet]\n" +
           "\n" +
-          "  --raw     read the stage-1 raw layer (all hosts found under dir)\n" +
           "  --replay  also write replay/<sessionId>.parquet (message bodies)\n" +
           "  --root    read JSONL directly; repeatable; defaults to this machine's\n",
       );
       process.exit(0);
     } else {
-      // Never fall through silently. An unrecognised flag once meant `--raw`
-      // was ignored and the run quietly read the whole live corpus instead of
-      // the frozen subset it was pointed at — the numbers looked plausible and
-      // the mistake showed up only as a failed equivalence check.
+      // Never fall through silently. An unrecognised flag once meant a source
+      // selector was ignored and the run quietly read the whole live corpus
+      // instead of the subset it was pointed at — the numbers looked plausible
+      // and the mistake surfaced only much later.
       process.stderr.write(`cc-assay: unknown argument ${k}\n`);
       process.exit(2);
     }
@@ -92,17 +92,13 @@ const cacheFile = path.join(import.meta.dirname, "..", ".cache", "litellm-pricin
 const pricing = await loadPriceTable(cacheFile, { offline: args.offline });
 log(`pricing: ${Object.keys(pricing.entries).length} models @ ${pricing.version}`);
 
-// Where the records come from: the stage-1 raw layer (every host under one
-// directory) or this machine's JSONL. Log which one, because the two produce
-// the same table shapes and a mix-up is invisible in the output.
+// Which transcripts are being read. Logged because an unexpected root produces
+// perfectly plausible output.
 const roots = args.roots ?? defaultRoots();
-const source = args.rawDir
-  ? { kind: "raw" as const, rawDir: args.rawDir }
-  : { kind: "jsonl" as const, roots };
-log(args.rawDir ? `source:  raw @ ${args.rawDir}` : `source:  jsonl @ ${roots.join(", ")}`);
+const source = { kind: "jsonl" as const, roots };
+log(`source:  jsonl @ ${roots.join(", ")}`);
 
 const { normalized, invariants, stats, replay } = await normalizeCorpus({
-  ...(args.rawDir ? { rawDir: args.rawDir } : {}),
   roots,
   pricing,
   idleGapSeconds: args.idleGapSeconds,

@@ -183,8 +183,7 @@ export function hostInfo() {
   if (!rt) {
     return {
       ok: false,
-      error:
-        "no DuckDB host is running — start it with `pnpm serve` (or `pnpm serve --flat` for the legacy flat data layout)",
+      error: "no DuckDB host is running — start it with `pnpm serve`",
     };
   }
   return {
